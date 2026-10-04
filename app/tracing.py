@@ -59,13 +59,14 @@ class TraceStore:
         if path:
             path.parent.mkdir(parents=True, exist_ok=True)
 
-    def record(self, trace: dict) -> None:
+    def record(self, trace: dict, persist: bool = True) -> None:
+        """persist=False: keep in memory only (used for visitors' private documents)."""
         with self.lock:
             self.recent.append(trace)
-            if self.path:
+            if persist and self.path:
                 with self.path.open("a") as f:
                     f.write(json.dumps(trace) + "\n")
-        if self.langfuse:
+        if persist and self.langfuse:
             export_to_langfuse(trace)
 
     def metrics(self) -> dict:

@@ -29,8 +29,9 @@ question
   │
   ├─ 4. Relevance guardrail .... best score too low? → "I don't know" instead of guessing
   │
-  ├─ 5. Generation ............. GPT-4o-mini via LangChain, must cite sources as [1], [2]
-  │                              (no API key? an extractive fallback answers from the text)
+  ├─ 5. Generation ............. LLM via LangChain, must cite sources as [1], [2]. Fallback chain:
+  │                              visitor's OpenAI key → rotating pool of free Gemini keys
+  │                              → server OpenAI key (optional) → extractive (no-LLM) answer
   │
   ├─ 6. Output guardrail ....... checks every answer sentence against the sources
   │                              → groundedness score, flags possible hallucinations
@@ -53,7 +54,9 @@ rag-platform/
 │   ├── retriever.py     hybrid retrieval + Reciprocal Rank Fusion
 │   ├── reranker.py      cross-encoder reranking
 │   ├── guardrails.py    input / relevance / grounding checks
-│   ├── llm.py           LLM answer (LangChain + OpenAI) + no-LLM fallback + cost
+│   ├── llm.py           LLM fallback chain (visitor key → Gemini key pool → extractive) + cost
+│   ├── workspace.py     visitor sandbox: view / remove / upload docs in a private, auto-resetting copy
+│   ├── documents.py     text extraction for uploads (.txt .md .pdf .docx)
 │   ├── tracing.py       traces, metrics (p50/p95, cost), Langfuse export
 │   ├── pipeline.py      ← START HERE: wires all steps together
 │   ├── api.py           FastAPI endpoints
@@ -66,7 +69,7 @@ rag-platform/
 └── .github/workflows/ci.yml   CI/CD: lint + tests → build & publish Docker image to ghcr.io
 ```
 
-Each module does one job and is swappable: e.g. replace `OpenAIGenerator` with another LLM, or
+Each module does one job and is swappable: e.g. replace `ChatGenerator` with another LLM, or
 `QdrantStore` with another vector DB, without touching the rest.
 
 ---
@@ -89,7 +92,7 @@ Open **http://localhost:8000**.
 The **first start takes about 1–2 minutes**: it downloads the two small models (~150 MB) and
 indexes the documents in `data/docs/` into `data/qdrant/`. Later starts take a few seconds.
 To rebuild the index after changing documents in `data/docs/`: stop the server, run `python -m app.ingest`, start it again.
-Any `.md`, `.txt` or `.rst` file in `data/docs/` is indexed.
+Any `.md`, `.txt` or `.rst` file in `data/docs/` is indexed, and each one appears in the demo's document list.
 
 ### CI/CD
 
@@ -138,13 +141,39 @@ More questions with their correct answers are in `DEMO_QUESTIONS.md`.
 of where each answer came from. This system retrieves the right internal document, cites it, and
 guardrails check the answer actually matches it, with every request traced for latency and cost."
 
+## Live demo: visitor sandbox
+
+The public demo lets every visitor explain-by-doing:
+
+- **See the knowledge base.** All sample documents are listed with their chunk counts; *View* opens the full text,
+  and every answer source has *Open full document*.
+- **Swap in their own files.** Visitors can remove samples and upload `.txt`, `.md`, `.pdf` or `.docx` files
+  (max 5 files, 2 MB each). Uploads go through the same clean → chunk → embed → hybrid index → rerank pipeline.
+- **Private and self-resetting.** Changes live in an in-memory session keyed by a random id that only the
+  visitor's browser tab knows. Reloading the page, pressing *Reset*, or 30 minutes idle brings back the
+  original samples. The shared Qdrant index is never modified. Questions about private uploads are not
+  written to disk or exported to Langfuse, and `/traces` only shows them to the same session.
+- **Bring your own key.** Visitors can paste an OpenAI key (kept in the tab's memory, sent per request,
+  never stored or logged; errors are scrubbed of key fragments). Without one, answers come from a pool of
+  free Gemini keys (`GEMINI_API_KEYS`), rotated round-robin; a key that hits a quota is benched for a minute
+  (an invalid key for an hour). If every LLM fails, the extractive fallback still answers with citations.
+
+Deploying on Cloud Run: set `GEMINI_API_KEYS` (as a Secret Manager secret) and keep max instances at 1,
+because sessions live in that instance's memory.
+
 ## API
 
 | Method | Path | Returns |
 |---|---|---|
-| POST | `/ask` `{"question": "..."}` | answer, sources, guardrail results, trace |
+| POST | `/ask` `{"question": "...", "session_id": "..."}` (+ optional `X-OpenAI-Key` header) | answer, sources, guardrail results, trace |
+| GET | `/documents?session=…` | the documents that session searches (samples if none) |
+| GET | `/documents/{id}?session=…` | one document's full text |
+| POST | `/sessions/{id}/documents` `{"filename", "content_base64"}` | upload a file into the visitor's private copy |
+| DELETE | `/sessions/{id}/documents/{doc_id}` | remove a document from the private copy |
+| POST | `/sessions/{id}/reset` | back to the original samples |
+| GET | `/config` | which LLMs are available (for the UI) |
 | GET | `/metrics` | requests, blocked, hallucination flags, p50/p95 latency, tokens, cost |
-| GET | `/traces?limit=20` | latest request traces |
+| GET | `/traces?limit=20&session=…` | latest request traces (private-session traces only with their session id) |
 | GET | `/health` | liveness |
 | GET | `/` | demo UI |
 
@@ -167,6 +196,7 @@ guardrails check the answer actually matches it, with every request traced for l
 - Guardrail patterns are rule-based; a production system would add a moderation model (e.g. OpenAI moderation or Llama Guard).
 - Add an evaluation set (questions + expected sources) to measure retrieval hit-rate and answer quality over time.
 - Streaming responses and response caching for repeated questions.
+- Visitor sessions live in one instance's memory; scaling out would need a shared store (e.g. Redis + a Qdrant collection per session).
 
 Corpus: Quillfeather Labs is a fictional company. Its documents were written for this project to simulate
 private internal data that public LLMs have never seen. Any resemblance to a real company is coincidental.

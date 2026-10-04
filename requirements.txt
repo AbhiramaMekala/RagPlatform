@@ -3,6 +3,7 @@ uvicorn[standard]>=0.30
 pydantic>=2.7
 numpy>=1.26
 python-dotenv>=1.0
+pypdf>=4.0  # read uploaded PDFs in the demo sandbox
 # retrieval
 qdrant-client>=1.12
 fastembed>=0.5

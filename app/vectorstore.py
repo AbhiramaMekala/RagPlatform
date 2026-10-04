@@ -57,6 +57,35 @@ class QdrantStore:
                 return sorted(chunks, key=lambda c: c.id)
 
 
+class MemoryStore:
+    """Tiny in-memory vector store (cosine similarity with numpy).
+
+    Used for each visitor's private document set in the demo: it's built in milliseconds,
+    needs no server, and disappears when the visitor's session ends.
+    """
+
+    def __init__(self, chunks: list[Chunk], vectors: np.ndarray):
+        self.chunks = chunks
+        if len(chunks):
+            v = np.asarray(vectors, dtype=np.float32)
+            self.vectors = v / (np.linalg.norm(v, axis=1, keepdims=True) + 1e-9)
+        else:
+            self.vectors = np.zeros((0, 1), dtype=np.float32)
+
+    def count(self) -> int:
+        return len(self.chunks)
+
+    def search(self, vector: np.ndarray, k: int) -> list[Hit]:
+        if not self.chunks:
+            return []
+        q = np.asarray(vector, dtype=np.float32)
+        sims = self.vectors @ (q / (np.linalg.norm(q) + 1e-9))
+        return [Hit(self.chunks[i], float(sims[i])) for i in np.argsort(-sims)[:k]]
+
+    def all_chunks(self) -> list[Chunk]:
+        return list(self.chunks)
+
+
 def _to_chunk(point) -> Chunk:
     p = point.payload
     return Chunk(id=int(point.id), text=p["text"], source=p["source"], title=p["title"])

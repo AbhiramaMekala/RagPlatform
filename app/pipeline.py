@@ -14,7 +14,7 @@ question
 import logging
 
 from . import guardrails
-from .llm import ExtractiveGenerator
+from .llm import ExtractiveGenerator, describe_error, redact_secrets
 from .retriever import reciprocal_rank_fusion
 from .tracing import Trace
 
@@ -28,8 +28,15 @@ class RAGPipeline:
         self.embedder, self.retriever, self.reranker, self.generator = embedder, retriever, reranker, generator
         self.traces = traces
 
-    def ask(self, question: str) -> dict:
+    def ask(self, question: str, retriever=None, generator=None, trace_meta: dict | None = None, persist: bool = True) -> dict:
+        """retriever/generator override the defaults for one request (a visitor's private documents,
+        the visitor's own API key). trace_meta is stored on the trace; persist=False keeps the trace
+        in memory only (not written to disk or exported to Langfuse)."""
         t = Trace(question)
+        t.data.update(trace_meta or {})
+        t.persist = persist  # per request (requests run concurrently in worker threads)
+        retriever = retriever or self.retriever
+        generator = generator or self.generator
 
         # 1. input guardrail
         with t.span("guard.input") as sp:
@@ -41,10 +48,10 @@ class RAGPipeline:
 
         # 2. hybrid retrieval
         with t.span("retrieve.dense") as sp:
-            dense = self.retriever.dense(q, self.s.candidates)
+            dense = retriever.dense(q, self.s.candidates)
             sp["hits"] = len(dense)
         with t.span("retrieve.bm25") as sp:
-            keyword = self.retriever.keyword(q, self.s.candidates)
+            keyword = retriever.keyword(q, self.s.candidates)
             sp["hits"] = len(keyword)
         with t.span("fusion.rrf") as sp:
             fused = reciprocal_rank_fusion([dense, keyword])[: self.s.candidates]
@@ -68,14 +75,15 @@ class RAGPipeline:
 
         # 5. generation (falls back to extractive if the LLM call fails)
         llm_error = None
-        with t.span("generate", model=getattr(self.generator, "model", "")) as sp:
+        with t.span("generate", model=getattr(generator, "model", "")) as sp:
             try:
-                gen = self.generator.generate(q, top)
+                gen = generator.generate(q, top)
             except Exception as exc:
-                log.exception("LLM call failed, using extractive fallback")
-                llm_error = str(exc)[:200]
+                log.warning("LLM call failed, using extractive fallback: %s", describe_error(exc))
+                llm_error = describe_error(exc)
                 gen = ExtractiveGenerator(self.embedder).generate(q, top)
-            sp.update(model=gen.model, input_tokens=gen.input_tokens, output_tokens=gen.output_tokens, cost_usd=gen.cost_usd)
+            sp.update(model=gen.model, provider=gen.provider, input_tokens=gen.input_tokens, output_tokens=gen.output_tokens,
+                      cost_usd=gen.cost_usd)
 
         # 6. output guardrail (hallucination check)
         with t.span("guard.grounding") as sp:
@@ -87,7 +95,8 @@ class RAGPipeline:
             sp.update(groundedness=g.score, hallucination=g.hallucination)
 
         return self._done(
-            t, status="answered", answer=gen.text, sources=sources, model=gen.model,
+            t, status="answered", answer=gen.text, sources=sources, model=gen.model, provider=gen.provider,
+            llm_notes=[redact_secrets(n) for n in gen.notes],
             input_tokens=gen.input_tokens, output_tokens=gen.output_tokens, cost_usd=gen.cost_usd,
             groundedness=g.score, hallucination=g.hallucination, llm_error=llm_error,
             guard={"input": "passed" + (f" (redacted {', '.join(check.redactions)})" if check.redactions else ""),
@@ -106,7 +115,7 @@ class RAGPipeline:
 
     def _done(self, t: Trace, **data) -> dict:
         trace = t.finish(**{k: v for k, v in data.items() if k != "sources"})
-        self.traces.record(trace)
+        self.traces.record(trace, persist=getattr(t, "persist", True))
         return {"answer": data["answer"], "status": data["status"], "sources": data.get("sources", []),
                 "guardrails": data.get("guard", {}), "trace": trace}
 
@@ -116,7 +125,7 @@ def build_pipeline(settings) -> RAGPipeline:
     from .bm25 import BM25Index
     from .embeddings import Embedder
     from .ingest import ingest
-    from .llm import OpenAIGenerator
+    from .llm import LLMRouter
     from .reranker import CrossEncoderReranker
     from .retriever import HybridRetriever
     from .tracing import TraceStore
@@ -128,10 +137,10 @@ def build_pipeline(settings) -> RAGPipeline:
         ingest(settings, embedder, store)
     bm25 = BM25Index(store.all_chunks())
     reranker = CrossEncoderReranker(settings.rerank_model)
-    if settings.openai_api_key:
-        generator = OpenAIGenerator(settings.llm_model, settings.openai_api_key)
-    else:
-        log.warning("OPENAI_API_KEY not set - using extractive fallback (no LLM)")
-        generator = ExtractiveGenerator(embedder)
+    router = LLMRouter(settings, embedder)
+    log.info("LLM chain: visitor OpenAI key -> %d Gemini key(s) -> %s -> extractive fallback",
+             len(router.gemini), "server OpenAI key" if settings.openai_api_key else "(no server OpenAI key)")
     traces = TraceStore(settings.traces_file, langfuse=settings.langfuse_enabled)
-    return RAGPipeline(settings, embedder, HybridRetriever(embedder, store, bm25), reranker, generator, traces)
+    pipeline = RAGPipeline(settings, embedder, HybridRetriever(embedder, store, bm25), reranker, router.for_request(None), traces)
+    pipeline.router = router
+    return pipeline
