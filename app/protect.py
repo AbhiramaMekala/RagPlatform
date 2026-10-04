@@ -36,8 +36,8 @@ class RateLimiter:
 
 class AnswerCache:
     """Most visitors click the same sample questions. Answering those from memory makes the demo
-    instant and saves the free LLM quota. Only used for the shared sample documents and only for
-    answers worth repeating (an LLM answer, or a deterministic guardrail result)."""
+    instant and saves the free Gemini quota. Only used for the shared sample documents with no visitor
+    key involved (Gemini or no model), keyed by question + model, and only for answers worth repeating."""
 
     def __init__(self, max_items: int, ttl_seconds: float, clock=time.monotonic):
         self.max_items, self.ttl, self.clock = max_items, ttl_seconds, clock
@@ -45,11 +45,11 @@ class AnswerCache:
         self._lock = threading.Lock()
 
     @staticmethod
-    def key(question: str) -> str:
-        return re.sub(r"[^a-z0-9$@.%-]+", " ", question.lower()).strip()
+    def key(question: str, variant: str = "") -> str:
+        return variant + "|" + re.sub(r"[^a-z0-9$@.%-]+", " ", question.lower()).strip()
 
-    def get(self, question: str) -> dict | None:
-        k = self.key(question)
+    def get(self, question: str, variant: str = "") -> dict | None:
+        k = self.key(question, variant)
         with self._lock:
             item = self._items.get(k)
             if not item or self.clock() - item[0] > self.ttl:
@@ -58,12 +58,13 @@ class AnswerCache:
             self._items.move_to_end(k)
             return copy.deepcopy(item[1])
 
-    def put(self, question: str, result: dict) -> None:
+    def put(self, question: str, result: dict, variant: str = "") -> None:
         if self.max_items <= 0 or not worth_caching(result):
             return
+        k = self.key(question, variant)
         with self._lock:
-            self._items[self.key(question)] = (self.clock(), copy.deepcopy(result))
-            self._items.move_to_end(self.key(question))
+            self._items[k] = (self.clock(), copy.deepcopy(result))
+            self._items.move_to_end(k)
             while len(self._items) > self.max_items:
                 self._items.popitem(last=False)
 
@@ -72,5 +73,5 @@ def worth_caching(result: dict) -> bool:
     if result["status"] in ("blocked", "no_relevant_context"):
         return True
     t = result.get("trace", {})
-    # don't pin a fallback answer: next time a working LLM may answer better
-    return result["status"] == "answered" and t.get("model") != "extractive-fallback" and not t.get("llm_notes")
+    # don't pin an answer where the chosen model failed: next time it may work
+    return result["status"] == "answered" and not t.get("llm_notes") and not t.get("llm_error")

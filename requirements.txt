@@ -10,7 +10,8 @@ qdrant-client>=1.12  # optional backend, used when QDRANT_URL is set (docker-com
 # documents
 langchain-text-splitters>=0.3
 pypdf>=4.0
-# answer generation (OpenAI and Gemini's OpenAI-compatible endpoint)
+# answer generation: Anthropic, OpenAI, and Gemini via its OpenAI-compatible endpoint
+langchain-anthropic>=0.3
 langchain-openai>=0.2
 # observability
 langfuse>=3.0,<4

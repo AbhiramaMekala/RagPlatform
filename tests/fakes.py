@@ -53,7 +53,7 @@ def corpus_index(emb=None):
 
 def make_pipeline(**overrides):
     emb = FakeEmbedder()
-    s = Settings(**{"top_k": 2, "gemini_api_keys": [], "openai_api_key": "", **overrides})
+    s = Settings(**{"top_k": 2, "gemini_api_keys": [], **overrides})
     return RAGPipeline(s, emb, FakeReranker(), TraceStore(log_json=False)), emb
 
 
@@ -62,4 +62,4 @@ def extractive(emb):
 
 
 def router(emb, **overrides):
-    return LLMRouter(Settings(**{"gemini_api_keys": [], "openai_api_key": "", **overrides}), emb)
+    return LLMRouter(Settings(**{"gemini_api_keys": [], **overrides}), emb)

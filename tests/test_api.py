@@ -22,7 +22,7 @@ UPLOAD = ("Zephyr Robotics handbook.\n\nEvery new engineer at Zephyr Robotics re
 def client(monkeypatch, tmp_path):
     def fake_services(_settings):
         pipeline, emb = make_pipeline()
-        s = Settings(index_dir=tmp_path / "index", gemini_api_keys=[], openai_api_key="", asks_per_minute=5)
+        s = Settings(index_dir=tmp_path / "index", gemini_api_keys=[], asks_per_minute=5)
         pipeline.s = s
         return Services(s, pipeline, Sessions(SampleLibrary.load(s, emb), emb, s), router(emb))
 
@@ -39,7 +39,7 @@ def test_health_ui_and_state(client):
     assert client.get("/health").json() == {"status": "ok"}
     assert "RAG" in client.get("/").text
     st = client.get("/api/state").json()
-    assert len(st["documents"]) >= 5 and st["custom"] is False and st["llm"]["gemini_keys"] == 0
+    assert len(st["documents"]) >= 5 and st["custom"] is False and st["llm"]["gemini"]["available"] is False
     doc = client.get(f"/api/documents/{st['documents'][0]['id']}").json()
     assert len(doc["text"]) > 100
     assert client.get("/api/documents/nope.md").status_code == 404
@@ -76,8 +76,12 @@ def test_bad_uploads(client):
     assert client.post("/api/sessions/bad id/reset").status_code == 400
 
 
-def test_visitor_key_and_rate_limit(client):
-    r = client.post("/api/ask", json={"question": "What is Project Kestrel?"}, headers={"X-OpenAI-Key": "not-a-key"}).json()
-    assert "doesn't look valid" in " ".join(r["trace"].get("llm_notes", []))
-    codes = [client.post("/api/ask", json={"question": f"What is Project Kestrel {i}?"}).status_code for i in range(6)]
+def test_model_choice_key_header_and_rate_limit(client):
+    r = client.post("/api/ask", json={"question": "Who has to approve a $7,000 purchase at Quillfeather Labs?", "provider": "anthropic"},
+                    headers={"X-LLM-Key": "not-a-key"}).json()
+    if r["status"] == "answered":
+        assert "doesn't look like an Anthropic key" in " ".join(r["trace"]["llm_notes"])
+    bad = client.post("/api/ask", json={"question": "hi", "provider": "skynet"})
+    assert bad.status_code == 422
+    codes = [client.post("/api/ask", json={"question": f"What is Project Kestrel {i}?"}).status_code for i in range(5)]
     assert 429 in codes

@@ -30,6 +30,6 @@ def build_services(settings) -> Services:
     library = SampleLibrary.load(settings, embedder)  # loads the prebuilt index (no embedding at startup)
     traces = TraceStore(settings.traces_file or None, langfuse=settings.langfuse_enabled)
     router = LLMRouter(settings, embedder)
-    log.info("Ready in %.1fs. LLM chain: visitor OpenAI key -> %d Gemini key(s)%s -> extractive fallback",
-             time.perf_counter() - t0, len(router.gemini), " -> server OpenAI key" if settings.openai_api_key else "")
+    log.info("Ready in %.1fs. %d Gemini demo key(s) loaded; visitors bring their own Anthropic/OpenAI keys",
+             time.perf_counter() - t0, len(router.gemini))
     return Services(settings, RAGPipeline(settings, embedder, reranker, traces), Sessions(library, embedder, settings), router)

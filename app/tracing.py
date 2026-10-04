@@ -84,7 +84,7 @@ class TraceStore:
             "avg_groundedness": round(statistics.mean(t.get("groundedness", 1) for t in answered), 3) if answered else None,
             "latency_ms": {"p50": _pct(lat, 50), "p95": _pct(lat, 95), "max": lat[-1]},
             "tokens_total": sum(t.get("input_tokens", 0) + t.get("output_tokens", 0) for t in traces),
-            "cost_usd_total": round(sum(t.get("cost_usd", 0) for t in traces), 6),
+            "cost_usd_total": round(sum(t.get("cost_usd") or 0 for t in traces), 6),  # None = unpriced model
         }
 
 

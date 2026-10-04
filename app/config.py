@@ -54,9 +54,11 @@ class Settings:
     grounding_similarity: float = _env("GROUNDING_SIMILARITY", 0.78)
     min_groundedness: float = _env("MIN_GROUNDEDNESS", 0.7)
 
-    # --- LLMs, tried in order: visitor's OpenAI key -> Gemini key pool -> server OpenAI key -> extractive ---
-    llm_model: str = _env("LLM_MODEL", "gpt-4o-mini")
-    openai_api_key: str = _env("OPENAI_API_KEY", "")  # leave empty on a public demo so visitors never cost you money
+    # --- LLMs: the visitor chooses (see llm.py). Anthropic / OpenAI use the visitor's own key; Gemini uses
+    # the site's free keys and runs only when picked; with nothing usable the answer is quoted (no LLM). ---
+    anthropic_models: list = field(default_factory=lambda: _list("ANTHROPIC_MODELS")
+                                   or ["claude-haiku-4-5-20251001", "claude-sonnet-5-5", "claude-opus-5-5"])
+    openai_models: list = field(default_factory=lambda: _list("OPENAI_MODELS") or ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "gpt-4o"])
     gemini_api_keys: list = field(default_factory=lambda: _list("GEMINI_API_KEYS"))
     gemini_model: str = _env("GEMINI_MODEL", "gemini-2.5-flash")
     gemini_base_url: str = _env("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")

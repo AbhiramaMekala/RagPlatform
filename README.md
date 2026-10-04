@@ -6,7 +6,7 @@ hallucinations, and a trace of every step with latency and cost.
 
 **Live demo:** [abhirama.tech/rag](https://abhirama.tech/rag) · runs on Google Cloud Run, scales to zero, costs ~$0/month.
 
-**Stack:** Python · FastAPI · LangChain · fastembed (ONNX) · Qdrant / NumPy · Gemini / OpenAI · Langfuse · Docker · Cloud Run · GitHub Actions
+**Stack:** Python · FastAPI · LangChain · fastembed (ONNX) · Qdrant / NumPy · Anthropic / OpenAI / Gemini · Langfuse · Docker · Cloud Run · GitHub Actions
 
 Why RAG? A public chatbot has never seen a company's internal documents, so it can't answer
 *"What caused incident INC-2291?"*. This system finds the right internal passage at question time, answers from it,
@@ -26,9 +26,9 @@ question
   │      └─ Reciprocal Rank Fusion ................. merges both lists by rank
   ├─ 3. Rerank ............... cross-encoder rereads (question, passage) pairs, keeps the best 4
   ├─ 4. Relevance guardrail .. best score too low? -> "I don't know" instead of guessing
-  ├─ 5. Generate ............. LLM writes the answer from those passages only, citing [1] [2]
-  │                            fallback chain: visitor's OpenAI key -> pool of free Gemini keys
-  │                            -> (optional) server OpenAI key -> extractive answer (no LLM)
+  ├─ 5. Generate ............. the model the visitor chose writes the answer from those passages only,
+  │                            citing [1] [2]: Anthropic or OpenAI (visitor's own key), Gemini (site's
+  │                            demo keys), or no model. If it can't answer, the passages are quoted instead.
   ├─ 6. Grounding guardrail .. every answer sentence checked against the sources -> hallucination flag
   └─ Trace ................... each step timed; tokens + $ cost -> UI, /api/metrics, Cloud Logging, Langfuse
 ```
@@ -40,9 +40,11 @@ question
 - **Bring your own documents.** Visitors can remove sample documents and upload `.txt` `.md` `.pdf` `.docx` files.
   Changes go into a private, in-memory copy that only their browser tab knows (copy-on-write). Reloading, *Restore
   originals*, or 30 idle minutes brings back the samples. Questions about uploads are never logged or exported.
-- **Bring your own key.** An OpenAI key typed into the page is sent with each question and never stored or logged
-  (key fragments are scrubbed from error messages). Without one, a rotating pool of free Gemini keys answers;
-  a key that hits its quota is benched for a minute. If every LLM fails, the extractive fallback still answers.
+- **Choose the model.** Visitors pick Anthropic or OpenAI and paste their own key and model name; the key is sent with
+  each question and never stored or logged (key fragments are scrubbed from error messages). **Gemini** runs on the
+  site's own free keys, but only when a visitor selects it: the keys rotate round-robin and one that hits its quota
+  is benched for a minute. With no key, a bad key, or any model failure, the answer is quoted directly from the
+  passages (no LLM) and the page says why. Retrieval, citations and guardrails work the same either way.
 - **Guardrails you can poke.** The dashed sample questions trigger PII redaction, the relevance refusal and
   prompt-injection blocking.
 
@@ -62,8 +64,8 @@ question
 1. Cloud Run → **Create service** → *Continuously deploy from a repository* → this repo, branch `main`, **Dockerfile**.
 2. Settings: allow public access · request-based billing · min instances **0**, max instances **1**
    (sessions and the cache live in memory) · container port **8000** · memory 2 GiB · CPU 1 · startup CPU boost on.
-3. Variables & Secrets: `GEMINI_API_KEYS` as a Secret Manager secret (comma-separated keys).
-   Leave `OPENAI_API_KEY` unset unless you want to pay for visitors' questions.
+3. Variables & Secrets: `GEMINI_API_KEYS` as a Secret Manager secret (comma-separated keys). These are only used
+   when a visitor picks Gemini. Visitors' own Anthropic/OpenAI keys never touch the server's configuration.
 4. Every push to `main` rebuilds and redeploys automatically.
 
 ## Run locally (Mac)
@@ -74,7 +76,7 @@ Requires Python 3.10–3.12.
 cd rag-platform
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env              # optional: add GEMINI_API_KEYS or OPENAI_API_KEY
+cp .env.example .env              # optional: add GEMINI_API_KEYS
 python -m app.build_index         # first time: downloads models (~150 MB) and builds data/index/
 uvicorn app.api:app --reload      # http://localhost:8000
 ```
@@ -114,8 +116,8 @@ loadtest/            Locust load test
 
 | Method | Path | Returns |
 |---|---|---|
-| POST | `/api/ask` `{"question", "session_id"?}` + optional `X-OpenAI-Key` header | answer, sources, guardrail results, trace |
-| GET | `/api/state?session=…` | the documents that session searches, sandbox limits, available LLMs |
+| POST | `/api/ask` `{"question", "session_id"?, "provider", "model"?}` + `X-LLM-Key` header for anthropic/openai | answer, sources, guardrail results, trace |
+| GET | `/api/state?session=…` | the documents that session searches, sandbox limits, model choices |
 | GET | `/api/documents/{id}?session=…` | one document's full text |
 | POST | `/api/sessions/{id}/documents` `{"filename", "content_base64"}` | add a file to the visitor's private copy |
 | DELETE | `/api/sessions/{id}/documents/{doc_id}` | remove a document from the private copy |
@@ -145,7 +147,7 @@ More questions with answers: `DEMO_QUESTIONS.md`.
 - **Three guardrails:** stop bad input early (cheap), refuse when nothing relevant was found (prevents most hallucinations), verify the output (catches the rest).
 - **Grounding check:** each answer sentence must be semantically close to a source sentence (cosine ≥ 0.78) or share ≥ 80% of its content words.
 - **NumPy vs Qdrant:** a vector database earns its keep at millions of vectors or many replicas. At this size an in-memory index is faster, cheaper and simpler, so it's the default; Qdrant is one environment variable away.
-- **Fallback chain:** the demo must never break. A missing, invalid or rate-limited key degrades the wording of the answer, not the retrieval, citations or guardrails.
+- **Visitor-chosen models:** the demo never spends the owner's money on a visitor's question, and never silently swaps models. A missing, invalid or rate-limited key only changes how the answer is worded (quoted instead of written), never the retrieval, citations or guardrails.
 
 ## Limitations / next steps
 

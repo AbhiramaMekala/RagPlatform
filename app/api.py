@@ -8,6 +8,7 @@ import binascii
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -47,6 +48,10 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 class AskRequest(BaseModel):
     question: str = Field(..., max_length=2000, examples=["What is Project Kestrel and when does it launch?"])
     session_id: str | None = Field(None, max_length=64, description="Visitor session; omit to use the sample documents")
+    provider: Literal["anthropic", "openai", "gemini", "none"] = Field(
+        "none", description="Who writes the answer. anthropic/openai need the visitor's key in the X-LLM-Key header; "
+                            "gemini uses the site's demo keys; none quotes the documents (no LLM)")
+    model: str | None = Field(None, max_length=80, examples=["claude-haiku-4-5-20251001"])
 
 
 class UploadRequest(BaseModel):
@@ -86,23 +91,26 @@ def health():
 # ---------- ask ----------
 
 @app.post("/api/ask")
-async def ask(req: AskRequest, request: Request, x_openai_key: str | None = Header(None, alias="X-OpenAI-Key")):
+async def ask(req: AskRequest, request: Request, x_llm_key: str | None = Header(None, alias="X-LLM-Key")):
     s = svc()
     limit("ask_limit", request, "Too many questions in a minute. Please wait a moment and try again.")
     index, private = s.sessions.index(req.session_id)
-    cacheable = not private and not x_openai_key
-    if cacheable and (hit := state["cache"].get(req.question)):
+    provider, model = s.router.resolve(req.provider, req.model)
+    # cache only shared-sample answers that involve no visitor key, separately per model
+    cacheable = not private and provider in ("gemini", "none")
+    variant = f"{provider}:{model}"
+    if cacheable and (hit := state["cache"].get(req.question, variant)):
         s.pipeline.traces.cache_hits += 1
         return {**hit, "cached": True, "workspace": "samples"}
 
-    generator = s.router.for_request(x_openai_key)  # the visitor's key is used for this request only, never stored
+    generator = s.router.for_request(provider, model, x_llm_key)  # a visitor's key is used for this request only
     result = await run_in_threadpool(  # CPU-bound (embeddings, reranking): keep the event loop free
         s.pipeline.ask, req.question, index, generator,
         {"session": req.session_id} if private else None,  # private traces are visible only to that session
         not private,  # ...and are never logged, written or exported
     )
     if cacheable:
-        state["cache"].put(req.question, result)
+        state["cache"].put(req.question, result, variant)
     return {**result, "cached": False, "workspace": "custom" if private else "samples"}
 
 

@@ -30,11 +30,12 @@ def test_cache_normalises_and_expires():
     assert cache.get("What is Kestrel?") is None
 
 
-def test_cache_skips_fallback_answers_and_evicts():
+def test_cache_skips_failed_models_separates_models_and_evicts():
     cache = AnswerCache(2, 100)
-    cache.put("a", answered(model="extractive-fallback"))
     cache.put("b", answered(notes=["key 1 failed"]))
-    assert cache.get("a") is None and cache.get("b") is None
+    assert cache.get("b") is None
+    cache.put("a", answered(model="extractive-fallback"), "none:extractive-fallback")  # chosen "no model": deterministic
+    assert cache.get("a", "none:extractive-fallback") is not None and cache.get("a", "gemini:gemini-2.5-flash") is None
     for q in "cde":
         cache.put(q, {"status": "blocked", "answer": "no", "trace": {}})
     assert cache.get("c") is None and cache.get("e") is not None
