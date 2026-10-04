@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  /* Same black-and-white system as abhirama.tech. Colour is used only to explain: yellow = citation,
-     green = check passed, red = blocked / unsupported, amber = fallback or declined, blue = selected / info. */
+  /* Same black-and-white system as abhirama.tech. Colour only explains:
+     yellow = citation, green = check passed, red = blocked / unsupported, amber = quoted without a model, blue = selected / yours. */
   :root {
     --bg: #000000; --surface: #0b0b0b; --surface-2: #161616;
     --line: rgba(255, 255, 255, 0.12); --line-strong: rgba(255, 255, 255, 0.26);
@@ -19,7 +19,7 @@
     --good: #22c55e; --bad: #f87171; --warn: #fbbf24; --info: #60a5fa; --info-soft: rgba(96, 165, 250, 0.14);
     --font: "Inter", "Aptos", "Segoe UI", system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-    --r: 16px; --r-sm: 10px; --r-pill: 999px;
+    --r: 16px; --r-sm: 10px; --r-pill: 999px; --pad: 20px;
     color-scheme: dark;
   }
   @media (prefers-color-scheme: light) {
@@ -51,45 +51,70 @@
   .mono { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.02em; color: var(--faint); }
   .num { font-variant-numeric: tabular-nums; }
 
-  /* ---------- page frame: full screen ---------- */
-  .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
-  .top h1 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; }
-  .top p { margin: 2px 0 0; color: var(--muted); font-size: 0.86rem; }
-  .top a { font-size: 0.86rem; font-weight: 500; color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
-  .top a:hover { color: var(--text); border-color: var(--text); }
-  .layout { display: grid; grid-template-columns: minmax(320px, 420px) minmax(0, 1fr); gap: 20px; padding: 20px 24px 40px; align-items: start; }
-  .side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-  .main { display: flex; flex-direction: column; gap: 20px; min-width: 0; max-width: 980px; }
-  @media (max-width: 900px) {
-    .layout { grid-template-columns: 1fr; padding: 16px 16px 32px; }
-    .top { padding: 14px 16px; }
+  /* ================= header: back | title | source ================= */
+  .top { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .top-back { display: flex; align-items: center; gap: 8px; padding: 0 22px; border-right: 1px solid var(--line); text-decoration: none;
+              font-size: 0.88rem; font-weight: 600; color: var(--text); white-space: nowrap; transition: background .15s, color .15s; }
+  .top-back:hover { background: var(--text); color: var(--bg); }
+  .top-back svg { width: 16px; height: 16px; }
+  .top-title { flex: 1; min-width: 0; padding: 16px 22px; }
+  .top-title h1 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; }
+  .top-title p { margin: 2px 0 0; color: var(--muted); font-size: 0.86rem; }
+  .top-link { display: flex; align-items: center; padding: 0 22px; border-left: 1px solid var(--line); font-size: 0.86rem; font-weight: 500;
+              color: var(--muted); text-decoration: none; white-space: nowrap; transition: background .15s, color .15s; }
+  .top-link:hover { background: var(--text); color: var(--bg); }
+  @media (max-width: 640px) {
+    .top-back, .top-link { padding: 0 14px; }
+    .top-back span, .top-title p { display: none; }
+    .top-title { padding: 14px; }
   }
 
-  /* ---------- sections ---------- */
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
-  .card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
-  .card-head > div { flex: 1 1 220px; min-width: 0; }
-  .card-head h2 { margin: 0; font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
-  .card-head p { margin: 3px 0 0; color: var(--muted); font-size: 0.84rem; line-height: 1.45; }
-  .card-body { padding: 16px 20px 20px; }
+  /* ================= layout: set up | run ================= */
+  .layout { display: grid; grid-template-columns: minmax(320px, 440px) minmax(0, 1fr); gap: 24px; padding: 24px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .col-label { display: flex; align-items: baseline; gap: 10px; margin: 0 2px; }
+  .col-label h2 { margin: 0; font-size: 0.95rem; font-weight: 700; }
+  .col-label p { margin: 0; font-size: 0.82rem; color: var(--faint); }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; padding: 16px; gap: 28px; } }
+
+  /* ================= the one block component every section uses ================= */
+  .block { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+  .block-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 14px; padding: 16px var(--pad); border-bottom: 1px solid var(--line); }
+  .step { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-strong); display: grid; place-items: center;
+          font: 500 0.78rem/1 var(--mono); color: var(--muted); }
+  .block-title { flex: 1 1 150px; min-width: 0; }
+  .block-title h3 { margin: 2px 0 0; font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
+  .block-title p { margin: 2px 0 0; color: var(--muted); font-size: 0.84rem; line-height: 1.45; }
+  .block-aside { flex: none; align-self: center; }
+  .block-body { padding: var(--pad); }
+  .placeholder { margin: 0; padding: 18px; border: 1px dashed var(--line-strong); border-radius: var(--r-sm); color: var(--faint); font-size: 0.86rem; text-align: center; }
+
   .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--text); background: var(--text); color: var(--bg); border-radius: var(--r-pill);
-         padding: 8px 16px; font-weight: 600; font-size: 0.88rem; cursor: pointer; white-space: nowrap; transition: opacity .15s; }
+         padding: 8px 16px; font-weight: 600; font-size: 0.86rem; cursor: pointer; white-space: nowrap; transition: opacity .15s; }
   .btn:hover { opacity: .85; }
   .btn:disabled { opacity: .5; cursor: progress; }
-  .btn-line { background: transparent; color: var(--text); border-color: var(--line-strong); font-weight: 500; }
+  .btn-line { background: transparent; color: var(--text); border-color: var(--line-strong); }
   .btn-line:hover { border-color: var(--text); opacity: 1; }
   .link-btn { background: none; border: 0; padding: 0; color: var(--text); font-size: 0.84rem; font-weight: 600; border-bottom: 1px solid var(--line-strong); cursor: pointer; }
   .link-btn:hover { border-color: var(--text); }
+  .status { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 0; padding: 10px 12px; border-radius: var(--r-sm); background: var(--bg);
+            border: 1px solid var(--line); font-size: 0.84rem; color: var(--muted); }
+  .status b { color: var(--text); }
+  .status .dot { margin-top: 0.5em; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+  .dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); } .dot.info { background: var(--info); }
 
-  /* ---------- knowledge base ---------- */
-  .kb-stats { display: flex; gap: 16px; margin-top: 8px; }
-  .kb-stats span { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
-  .kb-stats b { color: var(--text); font-weight: 600; }
+  /* ---------- 1. knowledge base ---------- */
+  .kb-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .kb-stat { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); }
+  .kb-stat b { display: block; font-size: 1.2rem; font-weight: 700; line-height: 1.2; }
+  .kb-stat span { font-size: 0.76rem; color: var(--muted); }
   .docs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .doc { display: grid; grid-template-columns: 28px 1fr auto; gap: 0 10px; align-items: start; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); cursor: pointer; transition: border-color .15s; }
+  .doc { display: grid; grid-template-columns: 30px 1fr auto; gap: 0 10px; align-items: start; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-sm);
+         background: var(--bg); cursor: pointer; transition: border-color .15s; }
   .doc:hover { border-color: var(--line-strong); }
   .doc.open { border-color: var(--info); box-shadow: 0 0 0 1px var(--info) inset; }
-  .doc-icon { width: 28px; height: 32px; border: 1px solid var(--line-strong); border-radius: 4px; display: grid; place-items: center; font: 600 9px/1 var(--mono); color: var(--faint); text-transform: lowercase; }
+  .doc-icon { width: 30px; height: 34px; border: 1px solid var(--line-strong); border-radius: 4px; display: grid; place-items: center; font: 600 9px/1 var(--mono); color: var(--faint); }
   .doc-main { min-width: 0; }
   .doc-title { display: block; width: 100%; background: none; border: 0; padding: 0; text-align: left; font-size: 0.88rem; font-weight: 600; line-height: 1.35; cursor: pointer; }
   .doc-meta { display: block; margin-top: 3px; font-size: 0.75rem; color: var(--faint); }
@@ -97,126 +122,142 @@
   .tag.yours { border-color: var(--info); color: var(--info); }
   .doc-rm { background: none; border: 0; color: var(--faint); cursor: pointer; width: 28px; height: 28px; border-radius: 8px; font-size: 18px; line-height: 1; }
   .doc-rm:hover { color: var(--bad); background: var(--surface-2); }
-  .empty { padding: 18px; text-align: center; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: var(--r-sm); font-size: 0.86rem; }
-  .drop { margin-top: 10px; padding: 14px; border: 1px dashed var(--line-strong); border-radius: var(--r-sm); text-align: center; font-size: 0.84rem; color: var(--muted); transition: border-color .15s, background .15s; }
+  .drop { margin-top: 10px; padding: 14px; border: 1px dashed var(--line-strong); border-radius: var(--r-sm); text-align: center; font-size: 0.84rem; color: var(--muted);
+          transition: border-color .15s, background .15s; }
   .drop.over { border-color: var(--info); background: var(--info-soft); color: var(--text); }
   .drop small { display: block; margin-top: 2px; font-size: 0.74rem; color: var(--faint); }
-  .kb-status { font-size: 0.82rem; margin: 10px 0 0; min-height: 1.3em; color: var(--muted); }
-  .kb-status.err { color: var(--bad); }
-  .kb-status.ok { color: var(--good); }
-  .kb-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.78rem; color: var(--faint); }
+  .kb-msg { font-size: 0.82rem; margin: 10px 0 0; min-height: 1.3em; color: var(--muted); }
+  .kb-msg.err { color: var(--bad); } .kb-msg.ok { color: var(--good); }
+  .kb-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px;
+             border-top: 1px solid var(--line); font-size: 0.78rem; color: var(--faint); }
   .kb-foot p { margin: 0; flex: 1 1 200px; }
 
-  /* ---------- model ---------- */
-  .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; max-width: 620px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
-  .seg button { border: 0; background: transparent; color: var(--muted); border-radius: 9px; padding: 8px 4px; font-size: 0.82rem; font-weight: 600; cursor: pointer; line-height: 1.2; }
-  .seg button:hover { color: var(--text); }
-  .seg button[aria-checked="true"] { background: var(--text); color: var(--bg); }
-  .seg small { display: block; font-weight: 500; font-size: 0.68rem; opacity: .75; margin-top: 1px; }
-  .field { display: block; margin-top: 14px; min-width: 0; }
-  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-  @media (max-width: 640px) { .field-row { grid-template-columns: 1fr; } }
-  .field span { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; }
-  .field input, .field select { width: 100%; border: 1px solid var(--line-strong); background: var(--bg); border-radius: var(--r-sm); padding: 10px 12px; font-size: 0.9rem; }
-  .field input:focus, .field select:focus { border-color: var(--text); outline: none; }
-  .fine { font-size: 0.78rem; color: var(--faint); margin: 8px 0 0; line-height: 1.5; }
-  .model-status { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--bg); border: 1px solid var(--line); font-size: 0.84rem; color: var(--muted); }
-  .model-status b { color: var(--text); }
-  .model-status .dot { margin-top: 0.5em; }
+  /* ---------- 2. answer model ---------- */
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .choice { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-sm);
+            background: var(--bg); cursor: pointer; transition: border-color .15s; }
+  .choice:hover { border-color: var(--line-strong); }
+  .choice b { font-size: 0.9rem; }
+  .choice span { font-size: 0.76rem; color: var(--faint); }
+  .choice[aria-checked="true"] { border-color: var(--text); box-shadow: 0 0 0 1px var(--text) inset; }
+  .choice[aria-checked="true"] b::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--info); margin-right: 8px; vertical-align: 2px; }
 
-  /* ---------- ask ---------- */
+  /* ---------- 3. configuration ---------- */
+  .field { display: block; min-width: 0; }
+  .field + .field { margin-top: 14px; }
+  .field > span { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; }
+  .field input, .field select { width: 100%; border: 1px solid var(--line-strong); background: var(--bg); border-radius: var(--r-sm); padding: 10px 12px; font-size: 0.9rem; }
+  .field select { appearance: none; cursor: pointer; padding-right: 36px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+  .field input:focus, .field select:focus { border-color: var(--text); outline: none; }
+  .fixed { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); font-size: 0.9rem; }
+  .fine { font-size: 0.78rem; color: var(--faint); margin: 10px 0 0; line-height: 1.5; }
+
+  /* ---------- 4. ask ---------- */
   .ask { display: flex; gap: 8px; padding: 6px 6px 6px 18px; border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: var(--bg); }
   .ask:focus-within { border-color: var(--text); }
   .ask input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 1rem; padding: 8px 0; }
-  .tries { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .tries-label { font-size: 0.8rem; color: var(--faint); margin: 14px 0 8px; }
+  .tries { display: flex; flex-wrap: wrap; gap: 6px; }
   .try { border: 1px solid var(--line-strong); background: transparent; border-radius: var(--r-pill); padding: 6px 12px; font-size: 0.82rem; color: var(--muted); cursor: pointer; text-align: left; }
   .try:hover { color: var(--text); border-color: var(--text); }
   .try.probe { border-style: dashed; }
-  .tries-label { width: 100%; font-size: 0.8rem; color: var(--faint); margin: 0 0 2px; }
+  .using { margin: 14px 0 0; font-size: 0.8rem; color: var(--faint); }
+  .using b { color: var(--muted); font-weight: 600; }
 
-  /* ---------- answer ---------- */
-  .answer { font-size: 1.12rem; line-height: 1.65; margin: 0; white-space: pre-wrap; max-width: 72ch; }
+  /* ---------- 5. answer ---------- */
+  .answer { font-size: 1.1rem; line-height: 1.65; margin: 0; white-space: pre-wrap; max-width: 72ch; }
   .answer.muted { color: var(--muted); }
   .cite { font: 700 0.72rem/1 var(--font); background: var(--cite); color: var(--cite-ink); border: 0; border-radius: 5px; padding: 3px 6px; margin: 0 2px; vertical-align: 2px; cursor: pointer; }
   .checks { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
   .check { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border: 1px solid var(--line); border-radius: var(--r-pill); font-size: 0.8rem; color: var(--muted); }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
-  .dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); } .dot.info { background: var(--info); }
   .note { margin: 12px 0 0; font-size: 0.84rem; color: var(--warn); }
   .note.bad { color: var(--bad); }
 
+  /* ---------- 6. sources ---------- */
   .passages { display: flex; flex-direction: column; gap: 10px; }
-  .passage { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; background: var(--bg); }
+  .passage { display: grid; grid-template-columns: 34px 1fr; gap: 0 12px; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; background: var(--bg); }
   .passage.flash { animation: flash 1.4s ease; }
   @keyframes flash { 0%, 45% { border-color: var(--cite); box-shadow: 0 0 0 3px var(--cite-soft); } }
-  .passage-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .passage-head .cite { cursor: default; margin: 0; }
-  .passage-title { font-weight: 600; font-size: 0.9rem; }
-  .passage-meta { margin-left: auto; }
+  .rank { text-align: center; }
+  .rank .cite { cursor: default; margin: 0; display: inline-block; }
+  .passage-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .passage-title { font-weight: 600; font-size: 0.9rem; margin-right: auto; }
   .found { font-size: 0.72rem; padding: 1px 8px; border-radius: var(--r-pill); border: 1px solid var(--line-strong); color: var(--muted); }
   .passage-text { margin: 8px 0 0; font-size: 0.9rem; color: var(--muted); white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .passage-text.full { -webkit-line-clamp: unset; }
   .passage-actions { display: flex; gap: 18px; margin-top: 10px; }
 
+  /* ---------- 7. trace ---------- */
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .step { display: grid; grid-template-columns: 170px 1fr 74px; gap: 12px; align-items: center; font-size: 0.84rem; }
-  .step small { display: block; color: var(--faint); font-size: 0.72rem; line-height: 1.2; }
+  .trace-step { display: grid; grid-template-columns: 170px 1fr 74px; gap: 12px; align-items: center; font-size: 0.84rem; }
+  .trace-step small { display: block; color: var(--faint); font-size: 0.72rem; line-height: 1.2; }
   .track { position: relative; height: 8px; background: var(--surface-2); border-radius: 4px; }
   .bar { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--muted); min-width: 3px; }
   .bar.guard { background: var(--good); } .bar.gen { background: var(--info); } .bar.stop { background: var(--bad); }
   .ms { text-align: right; }
   .trace-foot { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); }
   .trace-foot b { color: var(--text); font-weight: 600; }
-  @media (max-width: 560px) { .step { grid-template-columns: 112px 1fr 58px; gap: 8px; } }
+  .how { margin: 0; padding-left: 20px; color: var(--muted); font-size: 0.86rem; }
+  .how li { margin: 4px 0; }
+  @media (max-width: 560px) { .trace-step { grid-template-columns: 112px 1fr 58px; gap: 8px; } :root { --pad: 16px; } }
 
-  .intro ol { margin: 10px 0 0; padding-left: 20px; color: var(--muted); font-size: 0.9rem; }
-  .intro li { margin: 4px 0; }
-  .intro p { margin: 0; color: var(--muted); font-size: 0.92rem; max-width: 70ch; }
-  .stats { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.8rem; color: var(--faint); padding: 4px 4px 0; }
+  .stats { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.8rem; color: var(--faint); padding: 0 2px; }
   .stats b { color: var(--text); font-weight: 600; }
 
-  /* ---------- document drawer ---------- */
+  /* ---------- document viewer ---------- */
   .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; }
   .scrim.on { opacity: 1; pointer-events: auto; }
-  .drawer { position: fixed; top: 0; right: 0; visibility: hidden; height: 100%; width: min(680px, 100%); background: var(--surface); border-left: 1px solid var(--line); z-index: 11;
-            transform: translateX(102%); transition: transform .24s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .24s; display: flex; flex-direction: column; }
+  .drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(680px, 100%); background: var(--surface); border-left: 1px solid var(--line); z-index: 11;
+            visibility: hidden; transform: translateX(102%); transition: transform .24s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .24s; display: flex; flex-direction: column; }
   .drawer.on { transform: none; visibility: visible; transition-delay: 0s; }
-  .drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+  .drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px var(--pad); border-bottom: 1px solid var(--line); }
   .drawer-head h2 { margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.3; }
-  .drawer-body { overflow: auto; padding: 20px 22px 48px; }
+  .drawer-body { overflow: auto; padding: var(--pad) var(--pad) 48px; }
   .doc-text { font: 0.95rem/1.75 var(--font); white-space: pre-wrap; word-break: break-word; margin: 0; max-width: 72ch; color: var(--muted); }
   mark { background: var(--cite); color: var(--cite-ink); border-radius: 3px; padding: 1px 2px; }
   .hint { display: flex; gap: 8px; align-items: center; font-size: 0.82rem; margin: 0 0 16px; padding: 9px 12px; border-radius: var(--r-sm); background: var(--cite-soft); color: var(--text); }
+  .hint .cite { cursor: default; }
 
   @media (prefers-reduced-motion: reduce) { .drawer, .scrim { transition: none; } .passage.flash { animation: none; } }
 </style>
 </head>
 <body>
 <header class="top">
-  <div>
+  <a class="top-back" href="https://abhirama.tech/#projects" target="_top" aria-label="Back to abhirama.tech">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    <span>Home</span>
+  </a>
+  <div class="top-title">
     <h1>Production RAG Platform</h1>
-    <p>Ask a question about the knowledge base. Every answer shows the passages it came from.</p>
+    <p>Ask a question about a knowledge base. Every answer shows the passages it came from.</p>
   </div>
-  <a href="https://github.com/AbhiramaMekala/RagPlatform" target="_blank" rel="noreferrer">Source code</a>
+  <a class="top-link" href="https://github.com/AbhiramaMekala/RagPlatform" target="_blank" rel="noreferrer">Source code</a>
 </header>
 
 <div class="layout">
-  <div class="side">
-    <!-- Knowledge base -->
-    <section class="card" aria-labelledby="kb-title">
-      <div class="card-head">
-        <div>
-          <h2 id="kb-title">Knowledge base</h2>
-          <p>The documents the assistant searches. Click one to read it.</p>
-          <div class="kb-stats"><span><b id="kb-docs">–</b> documents</span><span><b id="kb-passages">–</b> searchable passages</span></div>
+  <!-- ================= Set up ================= -->
+  <div class="col">
+    <div class="col-label"><h2>Set up</h2><p>What to search, and who writes the answer</p></div>
+
+    <section class="block" aria-labelledby="t-kb">
+      <header class="block-head">
+        <span class="step" aria-hidden="true">1</span>
+        <div class="block-title"><h3 id="t-kb">Knowledge base</h3><p>The documents the assistant searches. Click one to read it.</p></div>
+        <div class="block-aside">
+          <label class="btn btn-line" for="file" id="add-btn">+ Add documents</label>
+          <input type="file" id="file" class="hidden" multiple accept=".txt,.md,.markdown,.rst,.csv,.pdf,.docx">
         </div>
-        <label class="btn btn-line" for="file" id="add-btn">+ Add documents</label>
-        <input type="file" id="file" class="hidden" multiple accept=".txt,.md,.markdown,.rst,.csv,.pdf,.docx">
-      </div>
-      <div class="card-body">
+      </header>
+      <div class="block-body">
+        <div class="kb-stats">
+          <div class="kb-stat"><b class="num" id="kb-docs">–</b><span>documents</span></div>
+          <div class="kb-stat"><b class="num" id="kb-passages">–</b><span>searchable passages</span></div>
+        </div>
         <ul class="docs" id="docs"></ul>
-        <div class="drop" id="drop">Drop files here to add them to the knowledge base<small id="drop-limits">.txt .md .pdf .docx, up to 2 MB each</small></div>
-        <p class="kb-status" id="kb-status" role="status"></p>
+        <div class="drop" id="drop">Drop files here to add them<small id="drop-limits">.txt .md .pdf .docx, up to 2 MB each</small></div>
+        <p class="kb-msg" id="kb-msg" role="status"></p>
         <div class="kb-foot">
           <p id="kb-note">Changes are private to you and reset when you reload.</p>
           <button type="button" class="link-btn hidden" id="reset">Restore original documents</button>
@@ -224,84 +265,109 @@
       </div>
     </section>
 
+    <section class="block" aria-labelledby="t-model">
+      <header class="block-head">
+        <span class="step" aria-hidden="true">2</span>
+        <div class="block-title"><h3 id="t-model">Answer model</h3><p>Who writes the final answer. Search, ranking and safety checks always run here.</p></div>
+      </header>
+      <div class="block-body">
+        <div class="choices" role="radiogroup" aria-labelledby="t-model" id="choices">
+          <button type="button" class="choice" role="radio" data-p="anthropic"><b>Anthropic</b><span>Claude, with your own key</span></button>
+          <button type="button" class="choice" role="radio" data-p="openai"><b>OpenAI</b><span>GPT, with your own key</span></button>
+          <button type="button" class="choice" role="radio" data-p="gemini"><b>Google Gemini</b><span id="gemini-sub">free demo keys</span></button>
+          <button type="button" class="choice" role="radio" data-p="none"><b>No model</b><span>quote the documents</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="t-config">
+      <header class="block-head">
+        <span class="step" aria-hidden="true">3</span>
+        <div class="block-title"><h3 id="t-config">Configuration</h3><p id="config-sub">Settings for the model you picked.</p></div>
+      </header>
+      <div class="block-body">
+        <div id="cfg-key">
+          <label class="field"><span id="key-label">API key</span>
+            <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></label>
+          <label class="field"><span>Model</span><select id="model"></select></label>
+          <p class="fine">Your key stays in this tab's memory only. It's sent with each question over HTTPS, used for that question, and never stored or logged.</p>
+        </div>
+        <div id="cfg-fixed" class="hidden">
+          <label class="field"><span>Model</span><div class="fixed" id="fixed-model"></div></label>
+        </div>
+        <div class="status" id="status"><span class="dot"></span><span id="status-text"></span></div>
+      </div>
+    </section>
   </div>
 
-  <main class="main">
-      <!-- Answer model -->
-      <section class="card" aria-labelledby="model-title">
-        <div class="card-head">
-          <div>
-            <h2 id="model-title">Answer model</h2>
-            <p>Search, reranking and the safety checks always run here. A language model only writes the final answer.</p>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="seg" role="radiogroup" aria-label="Who writes the answer" id="seg">
-            <button type="button" role="radio" data-p="anthropic">Anthropic<small>your key</small></button>
-            <button type="button" role="radio" data-p="openai">OpenAI<small>your key</small></button>
-            <button type="button" role="radio" data-p="gemini">Gemini<small>demo keys</small></button>
-            <button type="button" role="radio" data-p="none">No model<small>quotes</small></button>
-          </div>
-          <div id="key-fields">
-            <div class="field-row">
-              <label class="field"><span id="key-label">API key</span>
-                <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></label>
-              <label class="field"><span>Model</span>
-                <input type="text" id="model" list="model-list" autocomplete="off" spellcheck="false"></label>
-            </div>
-            <datalist id="model-list"></datalist>
-            <p class="fine">Your key stays in this tab's memory only. It's sent with each question over HTTPS, used for that question, and never stored or logged.</p>
-          </div>
-          <div class="model-status" id="model-status"><span class="dot"></span><span id="model-status-text"></span></div>
-        </div>
-      </section>
+  <!-- ================= Run ================= -->
+  <div class="col">
+    <div class="col-label"><h2>Run</h2><p>Ask, then see the answer, its sources and every step</p></div>
 
-    <!-- Ask -->
-    <section class="card">
-      <div class="card-body" style="padding-top:20px">
+    <section class="block" aria-labelledby="t-ask">
+      <header class="block-head">
+        <span class="step" aria-hidden="true">4</span>
+        <div class="block-title"><h3 id="t-ask">Ask a question</h3><p id="ask-sub">About the documents in the knowledge base.</p></div>
+      </header>
+      <div class="block-body">
         <form class="ask" id="ask-form" role="search">
           <input id="q" type="text" autocomplete="off" placeholder="Ask about the knowledge base…" aria-label="Your question" maxlength="500">
           <button class="btn" id="go">Ask</button>
         </form>
+        <p class="tries-label" id="tries-label"></p>
         <div class="tries" id="tries"></div>
+        <p class="using" id="using"></p>
       </div>
     </section>
 
-    <section class="card intro" id="intro">
-      <div class="card-head"><div><h2>How an answer is made</h2><p>The sample documents are the private handbook of Quillfeather Labs, a made-up company, so no public chatbot knows these answers.</p></div></div>
-      <div class="card-body">
-        <ol>
-          <li>Your question is checked for prompt injection and personal data.</li>
-          <li>Two searches run side by side: one by meaning, one by exact words. Their results are merged.</li>
-          <li>A reranking model rereads the best passages and keeps the most relevant four.</li>
-          <li>The answer is written from those passages only, with numbered citations, then fact-checked sentence by sentence.</li>
+    <section class="block" aria-labelledby="t-answer" aria-live="polite">
+      <header class="block-head">
+        <span class="step" aria-hidden="true">5</span>
+        <div class="block-title"><h3 id="t-answer">Answer</h3><p>Written only from the sources below, with numbered citations, then fact-checked.</p></div>
+        <span class="block-aside mono" id="answer-by"></span>
+      </header>
+      <div class="block-body">
+        <p class="placeholder" id="answer-empty">Ask a question to see the answer here.</p>
+        <div id="answer-box" class="hidden">
+          <p class="answer" id="answer"></p>
+          <ul class="checks" id="checks"></ul>
+          <p class="note hidden" id="why"></p>
+          <p class="note bad hidden" id="unsupported"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="t-sources">
+      <header class="block-head">
+        <span class="step" aria-hidden="true">6</span>
+        <div class="block-title"><h3 id="t-sources">Sources, ranked</h3><p>Found by two searches (meaning and exact words), merged, then reranked. Most relevant first.</p></div>
+      </header>
+      <div class="block-body">
+        <p class="placeholder" id="sources-empty">The passages behind the answer will appear here.</p>
+        <div class="passages" id="passages"></div>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="t-trace">
+      <header class="block-head">
+        <span class="step" aria-hidden="true">7</span>
+        <div class="block-title"><h3 id="t-trace">Pipeline trace</h3><p>Every step of the request, timed.</p></div>
+      </header>
+      <div class="block-body">
+        <ol class="how" id="how">
+          <li>Input check: blocks prompt injection, hides personal data.</li>
+          <li>Search by meaning and search by exact words run side by side.</li>
+          <li>The two result lists are merged, then a reranking model keeps the best four.</li>
+          <li>Relevance check: if nothing relevant was found, it declines instead of guessing.</li>
+          <li>The answer is written from those passages, then every sentence is fact-checked.</li>
         </ol>
+        <ol class="steps hidden" id="steps"></ol>
+        <div class="trace-foot num hidden" id="trace-foot"></div>
       </div>
-    </section>
-
-    <!-- 4. Answer -->
-    <section class="card hidden" id="answer-card" aria-live="polite">
-      <div class="card-head"><div><h2>Answer</h2></div><span class="mono" id="answer-by"></span></div>
-      <div class="card-body">
-        <p class="answer" id="answer"></p>
-        <ul class="checks" id="checks"></ul>
-        <p class="note hidden" id="why"></p>
-        <p class="note bad hidden" id="unsupported"></p>
-      </div>
-    </section>
-
-    <section class="card hidden" id="sources-card">
-      <div class="card-head"><div><h2>Sources</h2><p>The passages the answer was written from, in order of relevance.</p></div></div>
-      <div class="card-body"><div class="passages" id="passages"></div></div>
-    </section>
-
-    <section class="card hidden" id="trace-card">
-      <div class="card-head"><div><h2>Pipeline trace</h2><p>Every step of this request, timed.</p></div></div>
-      <div class="card-body"><ol class="steps" id="steps"></ol><div class="trace-foot num" id="trace-foot"></div></div>
     </section>
 
     <div class="stats num" id="stats"></div>
-  </main>
+  </div>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -311,7 +377,7 @@
     <button type="button" class="btn btn-line" id="viewer-close">Close</button>
   </div>
   <div class="drawer-body" id="viewer-body">
-    <p class="hint hidden" id="viewer-hint"><span class="cite" style="cursor:default">#</span><span id="viewer-hint-text"></span></p>
+    <p class="hint hidden" id="viewer-hint"><span class="cite" id="viewer-n">#</span><span id="viewer-hint-text"></span></p>
     <pre class="doc-text" id="viewer-text"></pre>
   </div>
 </aside>
@@ -331,7 +397,8 @@ const STEP_NAMES = {
   "fusion.rrf": "Merge results", "rerank": "Rerank", "guard.relevance": "Relevance check",
   "generate": "Write answer", "guard.grounding": "Fact check",
 };
-const PROVIDER_NAMES = { anthropic: "Anthropic", openai: "OpenAI", gemini: "Gemini", none: "No model" };
+const NAMES = { anthropic: "Anthropic", openai: "OpenAI", gemini: "Google Gemini", none: "No model" };
+const ORDER = ["anthropic", "openai", "gemini", "none"];
 // A fresh id per page load: changes to the knowledge base are private to this tab, and a reload starts over.
 const SID = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^A-Za-z0-9-]/g, "");
 const $ = (id) => document.getElementById(id);
@@ -351,15 +418,15 @@ async function api(path, opts = {}) {
   }
   return r.json();
 }
-const kbStatus = (msg, kind = "") => { $("kb-status").textContent = msg; $("kb-status").className = "kb-status" + (kind ? " " + kind : ""); };
+const kbMsg = (msg, kind = "") => { $("kb-msg").textContent = msg; $("kb-msg").className = "kb-msg" + (kind ? " " + kind : ""); };
 
-// ================= knowledge base =================
+// ================= 1. knowledge base =================
 async function loadState() {
   try {
     const st = await api(`/api/state?session=${SID}`);
     if (!LLM) { LLM = st.llm; initModel(); }
     renderKB(st);
-  } catch (e) { kbStatus("The server is waking up, retrying…"); setTimeout(loadState, 2500); }
+  } catch (e) { kbMsg("The server is waking up, retrying…"); setTimeout(loadState, 2500); }
 }
 
 function renderKB(st) {
@@ -374,16 +441,16 @@ function renderKB(st) {
   $("drop-limits").textContent = `.txt .md .pdf .docx, up to ${L.max_upload_mb ?? 2} MB each. ${left} more file${left === 1 ? "" : "s"} allowed.`;
   $("kb-note").textContent = st.custom
     ? `You're using your own copy. Others still see the originals; yours resets when you reload or after ${L.ttl_minutes ?? 30} idle minutes.`
-    : "Removing or adding documents changes only your private copy. Please don't upload anything sensitive.";
+    : "Adding or removing documents changes only your private copy. Please don't upload anything sensitive.";
   $("docs").innerHTML = docs.length ? docs.map((d) => {
-    const ext = (d.name.match(/\.([a-z0-9]+)$/i) || [, "doc"])[1].slice(0, 4);
+    const ext = (d.name.match(/\.([a-z0-9]+)$/i) || [, "doc"])[1].slice(0, 4).toLowerCase();
     return `<li class="doc${openDocId === d.id ? " open" : ""}" data-open="${esc(d.id)}">
       <span class="doc-icon" aria-hidden="true">${esc(ext)}</span>
-      <span class="doc-main"><button type="button" class="doc-title" data-open="${esc(d.id)}" title="${esc(d.title)}">${esc(d.title)}</button>
+      <span class="doc-main"><button type="button" class="doc-title" data-open="${esc(d.id)}">${esc(d.title)}</button>
         <span class="doc-meta"><span class="tag${d.origin === "uploaded" ? " yours" : ""}">${d.origin === "uploaded" ? "Yours" : "Sample"}</span>${d.chunks} passage${d.chunks === 1 ? "" : "s"}${d.truncated ? ", truncated" : ""}</span></span>
       <button type="button" class="doc-rm" data-remove="${esc(d.id)}" aria-label="Remove ${esc(d.title)}" title="Remove from the knowledge base">×</button>
     </li>`;
-  }).join("") : `<li class="empty">The knowledge base is empty. Add documents, or restore the originals.</li>`;
+  }).join("") : `<li class="placeholder">The knowledge base is empty. Add documents, or restore the originals.</li>`;
   renderTries();
 }
 
@@ -394,9 +461,9 @@ $("docs").addEventListener("click", async (e) => {
     const d = KB.documents.find((x) => x.id === rm.dataset.remove);
     try {
       renderKB(await api(`/api/sessions/${SID}/documents/${encodeURIComponent(rm.dataset.remove)}`, { method: "DELETE" }));
-      kbStatus(`Removed “${d ? d.title : "document"}” from the knowledge base.`);
+      kbMsg(`Removed “${d ? d.title : "document"}” from the knowledge base.`);
       if (openDocId === rm.dataset.remove) closeViewer();
-    } catch (err) { kbStatus(err.message, "err"); }
+    } catch (err) { kbMsg(err.message, "err"); }
     return;
   }
   const open = e.target.closest("[data-open]");
@@ -404,15 +471,15 @@ $("docs").addEventListener("click", async (e) => {
 });
 
 $("reset").onclick = async () => {
-  try { renderKB(await api(`/api/sessions/${SID}/reset`, { method: "POST" })); kbStatus("Restored the original documents.", "ok"); }
-  catch (e) { kbStatus(e.message, "err"); }
+  try { renderKB(await api(`/api/sessions/${SID}/reset`, { method: "POST" })); kbMsg("Restored the original documents.", "ok"); }
+  catch (e) { kbMsg(e.message, "err"); }
 };
 
 async function addFiles(files) {
   for (const f of files) {
     const mb = KB.limits.max_upload_mb ?? 2;
-    if (f.size > mb * 1e6) { kbStatus(`${f.name} is larger than ${mb} MB.`, "err"); continue; }
-    kbStatus(`Adding ${f.name}: reading, splitting into passages, indexing…`);
+    if (f.size > mb * 1e6) { kbMsg(`${f.name} is larger than ${mb} MB.`, "err"); continue; }
+    kbMsg(`Adding ${f.name}: reading, splitting into passages, indexing…`);
     try {
       const b64 = await new Promise((res, rej) => {
         const r = new FileReader();
@@ -423,9 +490,8 @@ async function addFiles(files) {
       renderKB(await api(`/api/sessions/${SID}/documents`, { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename: f.name, content_base64: b64 }) }));
       const added = KB.documents.filter((d) => d.origin === "uploaded").slice(-1)[0];
-      kbStatus(`Added ${f.name} to the knowledge base (${added ? added.chunks : "?"} passages).`, "ok");
-      $("q").focus();
-    } catch (err) { kbStatus(`${f.name}: ${err.message}`, "err"); }
+      kbMsg(`Added ${f.name} to the knowledge base (${added ? added.chunks : "?"} passages).`, "ok");
+    } catch (err) { kbMsg(`${f.name}: ${err.message}`, "err"); }
   }
 }
 $("file").onchange = (e) => { const files = [...e.target.files]; e.target.value = ""; addFiles(files); };
@@ -440,14 +506,14 @@ async function openDoc(id, passage, n) {
     const d = await api(`/api/documents/${encodeURIComponent(id)}?session=${SID}`);
     openDocId = d.id;
     $("viewer-title").textContent = d.title;
-    $("viewer-meta").textContent = `${d.name} · ${d.origin === "sample" ? "sample" : "your upload"} · ${d.chunks} passages${d.truncated ? " · truncated" : ""}`;
+    $("viewer-meta").textContent = `${d.name}, ${d.origin === "sample" ? "sample" : "your upload"}, ${d.chunks} passages${d.truncated ? ", truncated" : ""}`;
     const text = d.text.replace(/^---\n[\s\S]*?\n---\n+/, "");  // hide the file's metadata header
     const found = passage ? highlight(text, passage) : null;
     $("viewer-text").innerHTML = found || esc(text);
     $("viewer-hint").classList.toggle("hidden", !passage);
-    $("viewer-hint").querySelector(".cite").textContent = n || "#";
-    $("viewer-hint-text").textContent = found ? `Highlighted: the passage cited as [${n}].`
-      : `Source [${n}] comes from this document (formatting differs, so it can't be highlighted exactly).`;
+    $("viewer-n").textContent = n || "#";
+    $("viewer-hint-text").textContent = found ? `Highlighted: the passage cited as source ${n}.`
+      : `Source ${n} comes from this document (formatting differs, so it can't be highlighted exactly).`;
     lastFocus = document.activeElement;
     $("viewer").classList.add("on"); $("scrim").classList.add("on"); $("viewer").focus();
     renderKB(KB);
@@ -455,9 +521,8 @@ async function openDoc(id, passage, n) {
       const m = $("viewer-text").querySelector("mark"), body = $("viewer-body");
       body.scrollTop = m ? Math.max(0, m.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 120) : 0;
     });
-  } catch (e) { kbStatus(e.message, "err"); }
+  } catch (e) { kbMsg(e.message, "err"); }
 }
-
 // Indexing strips markup the original still has, so match the cited passage sentence by sentence.
 function highlight(text, passage) {
   const pieces = passage.replace(/\s+/g, " ").trim().split(/(?<=[.!?:])\s+/).filter((s) => s.length > 24);
@@ -487,73 +552,71 @@ $("viewer-close").onclick = closeViewer;
 $("scrim").onclick = closeViewer;
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeViewer(); });
 
-// ================= answer model =================
+// ================= 2. answer model + 3. configuration =================
 function initModel() {
   CHOICE.provider = LLM.default_provider || "anthropic";
   CHOICE.models.anthropic = LLM.anthropic.models[0];
   CHOICE.models.openai = LLM.openai.models[0];
-  if (!LLM.gemini.available) $("seg").querySelector('[data-p="gemini"]').querySelector("small").textContent = "not set up";
+  if (!LLM.gemini.available) $("gemini-sub").textContent = "not set up on this server";
   renderModel();
 }
-$("seg").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-p]");
-  if (!b) return;
-  saveFields(); CHOICE.provider = b.dataset.p; renderModel();
+function pick(p) { CHOICE.provider = p; renderModel(); }
+$("choices").addEventListener("click", (e) => { const b = e.target.closest("[data-p]"); if (b) pick(b.dataset.p); });
+$("choices").addEventListener("keydown", (e) => {
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  if (!step) return;
+  e.preventDefault();
+  pick(ORDER[(ORDER.indexOf(CHOICE.provider) + step + 4) % 4]);
+  $("choices").querySelector(`[data-p="${CHOICE.provider}"]`).focus();
 });
-$("seg").addEventListener("keydown", (e) => {  // arrow keys move between the four options
-  const order = ["anthropic", "openai", "gemini", "none"], i = order.indexOf(CHOICE.provider);
-  const next = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
-  if (!next) return;
-  e.preventDefault(); saveFields(); CHOICE.provider = order[(i + next + 4) % 4]; renderModel();
-  $("seg").querySelector(`[data-p="${CHOICE.provider}"]`).focus();
-});
-function saveFields() {
-  const p = CHOICE.provider;
-  if (p === "anthropic" || p === "openai") { CHOICE.keys[p] = $("key").value.trim(); CHOICE.models[p] = $("model").value.trim(); }
-}
-$("key").oninput = () => { saveFields(); renderStatus(); };
-$("model").oninput = () => { saveFields(); renderStatus(); };
+$("key").oninput = () => { CHOICE.keys[CHOICE.provider] = $("key").value.trim(); renderStatus(); };
+$("model").onchange = () => { CHOICE.models[CHOICE.provider] = $("model").value; renderStatus(); };
 
 function renderModel() {
-  const p = CHOICE.provider;
-  $("seg").querySelectorAll("[data-p]").forEach((b) => {
+  const p = CHOICE.provider, needsKey = p === "anthropic" || p === "openai";
+  $("choices").querySelectorAll("[data-p]").forEach((b) => {
     const on = b.dataset.p === p;
     b.setAttribute("aria-checked", String(on)); b.tabIndex = on ? 0 : -1;
   });
-  const needsKey = p === "anthropic" || p === "openai";
-  $("key-fields").classList.toggle("hidden", !needsKey);
+  $("cfg-key").classList.toggle("hidden", !needsKey);
+  $("cfg-fixed").classList.toggle("hidden", p !== "gemini");
+  $("config-sub").textContent = needsKey ? `Your ${NAMES[p]} API key and the model to use.`
+    : p === "gemini" ? "Nothing to enter: the site provides the keys and the model." : "Nothing to configure: no language model is used.";
   if (needsKey) {
-    $("key-label").textContent = `Your ${PROVIDER_NAMES[p]} API key`;
+    $("key-label").textContent = `Your ${NAMES[p]} API key`;
     $("key").placeholder = LLM[p].key_prefix + "…";
     $("key").value = CHOICE.keys[p];
-    $("model").value = CHOICE.models[p];
-    $("model-list").innerHTML = LLM[p].models.map((m) => `<option value="${esc(m)}">`).join("");
+    $("model").innerHTML = LLM[p].models.map((m) => `<option value="${esc(m)}"${m === CHOICE.models[p] ? " selected" : ""}>${esc(m)}</option>`).join("");
   }
+  $("fixed-model").textContent = LLM.gemini.model;
   renderStatus();
 }
 function renderStatus() {
-  const p = CHOICE.provider, dot = $("model-status").querySelector(".dot");
-  let text, kind = "";
+  const p = CHOICE.provider;
+  let text, kind = "", html = false;
   if (p === "anthropic" || p === "openai") {
     const key = CHOICE.keys[p];
-    if (!key) { text = `Add your ${PROVIDER_NAMES[p]} key to get written answers. Until then, answers are quoted straight from the documents.`; kind = "warn"; }
-    else if (!key.startsWith(LLM[p].key_prefix) || (p === "openai" && key.startsWith("sk-ant-"))) { text = `That doesn't look like an ${PROVIDER_NAMES[p]} key (they start with ${LLM[p].key_prefix}).`; kind = "bad"; }
-    else text = `Answers will be written by <b>${esc(CHOICE.models[p] || LLM[p].models[0])}</b> with your key.`;
+    if (!key) { text = `Add your ${NAMES[p]} key to get written answers. Until then, answers are quoted straight from the documents.`; kind = "warn"; }
+    else if (!key.startsWith(LLM[p].key_prefix) || (p === "openai" && key.startsWith("sk-ant-"))) { text = `That doesn't look like an ${NAMES[p]} key (they start with ${LLM[p].key_prefix}).`; kind = "bad"; }
+    else { text = `Ready: answers will be written by <b>${esc(CHOICE.models[p])}</b> with your key.`; html = true; }
   } else if (p === "gemini") {
-    if (LLM.gemini.available) text = `Answers will be written by <b>${esc(LLM.gemini.model)}</b> using the site's free demo keys. If they hit their limit, the answer is quoted instead.`;
+    if (LLM.gemini.available) { text = `Ready: answers will be written by <b>${esc(LLM.gemini.model)}</b> on the site's free demo keys. If they hit their limit, the answer is quoted instead.`; html = true; }
     else { text = "Gemini demo keys aren't set up on this server, so answers will be quoted from the documents."; kind = "warn"; }
-  } else { text = "No language model: the answer is the most relevant sentences, quoted from the documents with citations."; kind = "info"; }
-  dot.className = "dot" + (kind ? " " + kind : "");
-  $("model-status-text").innerHTML = kind === "warn" || kind === "bad" ? esc(text) : text;
+  } else { text = "Answers will be the most relevant sentences, quoted from the documents with citations."; kind = "info"; }
+  $("status").querySelector(".dot").className = "dot" + (kind ? " " + kind : "");
+  $("status-text")[html ? "innerHTML" : "textContent"] = text;
+  const who = p === "none" ? "no model (quotes)" : p === "gemini" ? `${LLM.gemini.model} (demo keys)` : `${CHOICE.models[p]}${CHOICE.keys[p] ? " (your key)" : " (no key yet: quotes)"}`;
+  $("using").innerHTML = `Searching <b>${KB.documents.length} documents</b>, answered by <b>${esc(who)}</b>. Change these in steps 1 to 3.`;
 }
 
-// ================= ask =================
+// ================= 4. ask =================
 function renderTries() {
   const samples = KB.documents.some((d) => d.origin === "sample");
   const mine = KB.documents.filter((d) => d.origin === "uploaded");
   const list = samples ? PROBES : PROBES.filter(([, probe]) => probe).slice(-1);
-  $("tries").innerHTML = `<p class="tries-label">${mine.length ? `Ask about “${esc(mine[mine.length - 1].title)}”, or try one of these.` : "Try one of these. The dashed ones test the safety checks."}</p>`
-    + list.map(([q, probe]) => `<button type="button" class="try${probe ? " probe" : ""}">${esc(q)}</button>`).join("");
+  $("tries-label").textContent = mine.length ? `Ask about “${mine[mine.length - 1].title}”, or try one of these:` : "Try one of these. The dashed ones test the safety checks:";
+  $("tries").innerHTML = list.map(([q, probe]) => `<button type="button" class="try${probe ? " probe" : ""}">${esc(q)}</button>`).join("");
+  if (LLM) renderStatus();
 }
 $("tries").addEventListener("click", (e) => { const b = e.target.closest(".try"); if (b) { $("q").value = b.textContent; ask(); } });
 $("ask-form").onsubmit = (e) => { e.preventDefault(); ask(); };
@@ -561,17 +624,15 @@ $("ask-form").onsubmit = (e) => { e.preventDefault(); ask(); };
 async function ask() {
   const question = $("q").value.trim();
   if (!question) { $("q").focus(); return; }
-  saveFields();
   $("go").disabled = true; $("go").textContent = "Searching…";
-  const p = CHOICE.provider;
+  const p = CHOICE.provider, byKey = p === "anthropic" || p === "openai";
   const headers = { "Content-Type": "application/json" };
-  if ((p === "anthropic" || p === "openai") && CHOICE.keys[p]) headers["X-LLM-Key"] = CHOICE.keys[p];
-  const body = { question, session_id: SID, provider: p, model: p === "anthropic" || p === "openai" ? CHOICE.models[p] || null : null };
+  if (byKey && CHOICE.keys[p]) headers["X-LLM-Key"] = CHOICE.keys[p];
+  const body = { question, session_id: SID, provider: p, model: byKey ? CHOICE.models[p] : null };
   try {
     render(await api("/api/ask", { method: "POST", headers, body: JSON.stringify(body) }));
   } catch (e) {
-    show(["answer-card"]); hide(["sources-card", "trace-card"]);
-    $("answer").textContent = e.message; $("answer").className = "answer muted";
+    showAnswer(); $("answer").textContent = e.message; $("answer").className = "answer muted";
     $("checks").innerHTML = ""; $("answer-by").textContent = "";
     ["why", "unsupported"].forEach((id) => $(id).classList.add("hidden"));
   } finally {
@@ -579,11 +640,11 @@ async function ask() {
     loadStats();
   }
 }
-const show = (ids) => ids.forEach((id) => $(id).classList.remove("hidden"));
-const hide = (ids) => ids.forEach((id) => $(id).classList.add("hidden"));
+function showAnswer() { $("answer-empty").classList.add("hidden"); $("answer-box").classList.remove("hidden"); }
 
+// ================= 5. answer, 6. sources, 7. trace =================
 function render(d) {
-  LAST = d; hide(["intro"]); show(["answer-card", "trace-card"]);
+  LAST = d; showAnswer();
   const t = d.trace, g = d.guardrails || {};
   $("answer").className = "answer" + (d.status === "answered" ? "" : " muted");
   $("answer").innerHTML = esc(d.answer).replace(/\[(\d+)\]/g, (m, n) => `<button type="button" class="cite" data-cite="${n}" aria-label="Go to source ${n}">${n}</button>`);
@@ -601,7 +662,6 @@ function render(d) {
   if (d.cached) c.push(["info", "Repeat question, answered from cache"]);
   if (d.workspace === "custom") c.push(["info", "Searched your copy of the knowledge base"]);
   $("checks").innerHTML = c.map(([k, s]) => `<li class="check"><span class="dot ${k}"></span>${esc(s)}</li>`).join("");
-
   const notes = t.llm_notes || [];
   $("why").classList.toggle("hidden", !notes.length && !t.llm_error);
   $("why").textContent = notes.length ? "Why it was quoted: " + notes.join("; ") + "." : t.llm_error ? `The model failed (${t.llm_error}), so the answer was quoted.` : "";
@@ -609,26 +669,32 @@ function render(d) {
   $("unsupported").classList.toggle("hidden", !uns.length);
   $("unsupported").textContent = uns.length ? "Not supported by the sources: " + uns.join(" ") : "";
 
-  $("sources-card").classList.toggle("hidden", !d.sources.length);
+  // 6. sources
+  $("sources-empty").classList.toggle("hidden", d.sources.length > 0);
+  $("sources-empty").textContent = d.status === "blocked" ? "No search ran: the question was blocked by the input check." : "The passages behind the answer will appear here.";
   $("passages").innerHTML = d.sources.map((s) => {
-    const found = s.found_by.length === 2 ? "both searches" : s.found_by[0] === "bm25" ? "word search" : "meaning search";
+    const found = s.found_by.length === 2 ? "found by both searches" : s.found_by[0] === "bm25" ? "found by word search" : "found by meaning search";
     return `<article class="passage" id="src-${s.n}">
-      <div class="passage-head"><span class="cite">${s.n}</span><span class="passage-title">${esc(s.title)}</span>
-        <span class="passage-meta"><span class="found">found by ${found}</span> <span class="mono num">relevance ${s.rerank_score}</span></span></div>
-      <p class="passage-text">${esc(s.text)}</p>
-      <div class="passage-actions"><button type="button" class="link-btn" data-more>Show full passage</button>
-        <button type="button" class="link-btn" data-doc="${esc(s.source)}" data-n="${s.n}">Open in document</button></div>
+      <div class="rank"><span class="cite">${s.n}</span></div>
+      <div>
+        <div class="passage-head"><span class="passage-title">${esc(s.title)}</span><span class="found">${found}</span><span class="mono num">score ${s.rerank_score}</span></div>
+        <p class="passage-text">${esc(s.text)}</p>
+        <div class="passage-actions"><button type="button" class="link-btn" data-more>Show full passage</button>
+          <button type="button" class="link-btn" data-doc="${esc(s.source)}" data-n="${s.n}">Open in document</button></div>
+      </div>
     </article>`;
   }).join("");
 
+  // 7. trace
+  $("how").classList.add("hidden"); $("steps").classList.remove("hidden"); $("trace-foot").classList.remove("hidden");
   const total = Math.max(t.total_ms, 1);
   $("steps").innerHTML = t.spans.map((s) => {
     const stopped = (s.name === "guard.input" && s.allowed === false) || (s.name === "guard.relevance" && s.relevant === false);
     const cls = stopped ? "stop" : s.name.startsWith("guard") ? "guard" : s.name === "generate" ? "gen" : "";
-    const detail = s.name.startsWith("retrieve") ? `${s.hits} hits${s.backend ? ", " + s.backend : ""}` : s.name === "fusion.rrf" ? `${s.candidates} candidates`
+    const detail = s.name.startsWith("retrieve") ? `${s.hits} hits` : s.name === "fusion.rrf" ? `${s.candidates} candidates`
       : s.name === "rerank" ? `best score ${s.best_score ?? "–"}` : s.name === "generate" ? (s.model === "extractive-fallback" ? "quoted" : s.model || "")
       : s.name === "guard.grounding" ? `${Math.round((s.groundedness ?? 1) * 100)}% supported` : stopped ? "stopped here" : "passed";
-    return `<li class="step"><span>${esc(STEP_NAMES[s.name] || s.name)}<small>${esc(detail)}</small></span>
+    return `<li class="trace-step"><span>${esc(STEP_NAMES[s.name] || s.name)}<small>${esc(detail)}</small></span>
       <span class="track"><span class="bar ${cls}" style="left:${(s.start_ms / total) * 100}%;width:${(s.ms / total) * 100}%"></span></span>
       <span class="ms mono num">${s.ms} ms</span></li>`;
   }).join("");
@@ -638,7 +704,7 @@ function render(d) {
     + `<span>Cost <b>${cost}</b></span><span>Trace <b>${esc(t.id)}</b></span>`;
 }
 
-document.querySelector(".main").addEventListener("click", (e) => {
+document.addEventListener("click", (e) => {
   const cite = e.target.closest("[data-cite]");
   if (cite) {
     const card = $(`src-${cite.dataset.cite}`);
