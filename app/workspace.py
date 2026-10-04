@@ -1,17 +1,15 @@
-"""Visitor sandbox for the public demo.
+"""Documents and who sees which ones.
 
-Everyone starts with the same sample documents (the Quillfeather Labs handbook). A visitor can open
-and read them, remove some, and upload their own files. Those changes live in a private, in-memory
-*session* that only that visitor's browser knows the id of:
-
-  - reloading the page starts a new session -> back to the original samples
-  - "Reset" deletes the session
-  - idle sessions expire after SESSION_TTL_MINUTES, and the oldest is dropped beyond MAX_SESSIONS
-
-The shared sample index (Qdrant) is never modified. A changed session gets its own small
-in-memory index (MemoryStore + BM25) built from pre-computed chunk vectors, so removing a
-document is instant and only uploaded files need embedding.
+SampleLibrary - the original documents. Chunked and embedded ONCE (at Docker build time) and saved to
+                data/index/, so a cold start just loads two small files instead of running the embedder.
+Sessions      - the visitor sandbox. A visitor who removes or uploads a file gets a private copy of the
+                library (copy-on-write) with its own small in-memory index. Only that browser tab knows
+                the session id, so: reload = new session = original samples again. Idle sessions expire,
+                and the least recently used is dropped beyond MAX_SESSIONS, so memory stays bounded.
 """
+import hashlib
+import json
+import logging
 import re
 import threading
 import time
@@ -21,157 +19,179 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .bm25 import BM25Index
-from .documents import extract_text, safe_filename, suffix
-from .ingest import SUPPORTED, chunk_documents, clean_text, extract_title
-from .models import Chunk
-from .retriever import HybridRetriever
-from .vectorstore import MemoryStore
+from .index import HybridIndex, QdrantDense
+from .models import Chunk, Document
+from .text import TEXT_VERSION, chunk_text, extract_upload_text, load_samples, safe_filename, suffix
 
+log = logging.getLogger("rag.workspace")
 SESSION_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 
 
 @dataclass
-class Document:
-    id: str  # also used as Chunk.source, so answer citations can link back to the document
-    name: str  # file name shown to the visitor
-    title: str
-    text: str  # full text shown in the document viewer
-    origin: str  # "sample" or "uploaded"
-    truncated: bool = False
-    chunks: list[Chunk] = field(default_factory=list, repr=False)
-    vectors: np.ndarray | None = field(default=None, repr=False)
+class IndexedDoc:
+    doc: Document
+    chunks: list[Chunk]
+    vectors: np.ndarray
 
     def summary(self) -> dict:
-        return {"id": self.id, "name": self.name, "title": self.title, "origin": self.origin,
-                "chars": len(self.text), "chunks": len(self.chunks), "truncated": self.truncated}
+        d = self.doc
+        return {"id": d.id, "name": d.name, "title": d.title, "origin": d.origin,
+                "chars": len(d.text), "chunks": len(self.chunks), "truncated": d.truncated}
 
 
-def index_document(doc_id: str, title: str, text: str, embedder, settings) -> tuple[list[Chunk], np.ndarray]:
-    """Clean -> chunk -> embed, exactly like the main ingestion pipeline."""
-    chunks = chunk_documents([(doc_id, title, clean_text(text))], settings.chunk_size, settings.chunk_overlap)
-    if not chunks:
-        return [], np.zeros((0, 1), dtype=np.float32)
-    return chunks, np.asarray(embedder.embed_documents([f"{c.title}\n{c.text}" for c in chunks]), dtype=np.float32)
+def embed_doc(doc: Document, embedder, settings) -> IndexedDoc:
+    chunks = chunk_text(doc, settings.chunk_size, settings.chunk_overlap)
+    return IndexedDoc(doc, chunks, embedder.embed_documents([f"{c.title}\n{c.text}" for c in chunks]))
 
+
+# ---------- the shared sample documents ----------
 
 class SampleLibrary:
-    """The original documents every visitor starts with (pre-chunked and pre-embedded once at startup)."""
-
-    def __init__(self, docs: list[Document]):
-        self.docs = docs
+    def __init__(self, docs: list[IndexedDoc], index: HybridIndex):
+        self.docs, self.index = docs, index
 
     @classmethod
     def load(cls, settings, embedder) -> "SampleLibrary":
-        docs = []
-        for path in sorted(settings.docs_dir.iterdir()):
-            if path.suffix.lower() not in SUPPORTED:
-                continue
-            raw = path.read_text(encoding="utf-8", errors="ignore")
-            title = extract_title(raw, path.stem)
-            chunks, vectors = index_document(path.name, title, raw, embedder, settings)
-            docs.append(Document(path.name, path.name, title, raw, "sample", chunks=chunks, vectors=vectors))
-        return cls(docs)
+        docs = load_samples(settings.docs_dir)
+        indexed = _load_prebuilt(settings, docs)
+        if indexed is None:
+            log.info("No prebuilt index for these documents - embedding %d documents now", len(docs))
+            indexed = [embed_doc(d, embedder, settings) for d in docs]
+            save_prebuilt(settings, indexed)
+        index = HybridIndex.from_parts([(d.chunks, d.vectors) for d in indexed], embedder)
+        if settings.qdrant_url and index.chunks:
+            vectors = np.stack([v for d in indexed for v in d.vectors])
+            index.dense_store = QdrantDense(settings.qdrant_url, settings.collection, vectors)
+        log.info("Sample library: %d documents, %d chunks, dense backend=%s", len(indexed), len(index.chunks), index.backend)
+        return cls(indexed, index)
 
 
-def build_retriever(docs: list[Document], embedder) -> HybridRetriever:
-    chunks, vectors = [], []
+def _fingerprint(settings, docs: list[Document]) -> str:
+    h = hashlib.sha256(f"{TEXT_VERSION}|{settings.embed_model}|{settings.chunk_size}|{settings.chunk_overlap}".encode())
     for d in docs:
-        for c, v in zip(d.chunks, d.vectors if d.vectors is not None else []):
-            chunks.append(Chunk(len(chunks), c.text, c.source, c.title))  # ids must be unique per index
-            vectors.append(v)
-    store = MemoryStore(chunks, np.stack(vectors) if vectors else np.zeros((0, 1), dtype=np.float32))
-    return HybridRetriever(embedder, store, BM25Index(chunks))
+        h.update(d.id.encode() + b"\0" + d.text.encode())
+    return h.hexdigest()[:16]
 
+
+def save_prebuilt(settings, indexed: list[IndexedDoc]) -> None:
+    try:
+        settings.index_dir.mkdir(parents=True, exist_ok=True)
+        meta = {"fingerprint": _fingerprint(settings, [d.doc for d in indexed]),
+                "docs": [{"id": d.doc.id, "chunks": [c.text for c in d.chunks]} for d in indexed]}
+        vectors = np.concatenate([d.vectors for d in indexed if len(d.vectors)]) if indexed else np.zeros((0, 1))
+        np.save(settings.index_dir / "vectors.npy", vectors.astype(np.float32))
+        (settings.index_dir / "index.json").write_text(json.dumps(meta))
+    except OSError as exc:  # read-only filesystem etc. - not fatal, we just embed again next start
+        log.warning("Could not save the prebuilt index: %s", exc)
+
+
+def _load_prebuilt(settings, docs: list[Document]) -> list[IndexedDoc] | None:
+    try:
+        meta = json.loads((settings.index_dir / "index.json").read_text())
+        vectors = np.load(settings.index_dir / "vectors.npy")
+    except (OSError, ValueError):
+        return None
+    if meta.get("fingerprint") != _fingerprint(settings, docs):
+        log.info("Prebuilt index is out of date (documents or settings changed)")
+        return None
+    out, row = [], 0
+    for doc, entry in zip(docs, meta["docs"]):
+        n = len(entry["chunks"])
+        chunks = [Chunk(i, t, doc.id, doc.title) for i, t in enumerate(entry["chunks"])]
+        out.append(IndexedDoc(doc, chunks, vectors[row : row + n]))
+        row += n
+    return out
+
+
+# ---------- the visitor sandbox ----------
 
 @dataclass
 class Session:
-    docs: "OrderedDict[str, Document]"
-    retriever: HybridRetriever
+    docs: "OrderedDict[str, IndexedDoc]"
+    index: HybridIndex
     last_used: float
-    uploads: int = 0
+    uploads: int = field(default=0)
 
 
-class SessionManager:
+class Sessions:
     def __init__(self, library: SampleLibrary, embedder, settings, clock=time.monotonic):
         self.library, self.embedder, self.s, self.clock = library, embedder, settings, clock
         self._sessions: OrderedDict[str, Session] = OrderedDict()
         self._lock = threading.Lock()
 
-    # ---------- lookups ----------
-    def documents(self, sid: str | None) -> list[Document]:
-        s = self._get(sid)
-        return list(s.docs.values()) if s else list(self.library.docs)
+    def __len__(self):
+        return len(self._sessions)
 
-    def document(self, sid: str | None, doc_id: str) -> Document:
-        for d in self.documents(sid):
-            if d.id == doc_id:
+    # --- reads ---
+    def index(self, sid: str | None) -> tuple[HybridIndex, bool]:
+        """(index to search, is_private). Visitors without changes share the sample index."""
+        s = self._get(sid)
+        return (s.index, True) if s else (self.library.index, False)
+
+    def document(self, sid: str | None, doc_id: str) -> IndexedDoc:
+        for d in self._docs(sid):
+            if d.doc.id == doc_id:
                 return d
         raise KeyError(doc_id)
 
-    def retriever(self, sid: str | None):
-        """The visitor's private retriever, or None = use the shared sample index."""
-        s = self._get(sid)
-        return s.retriever if s else None
-
     def state(self, sid: str | None) -> dict:
         s = self._get(sid)
-        docs = list(s.docs.values()) if s else self.library.docs
         return {
             "custom": s is not None,
-            "documents": [d.summary() for d in docs],
+            "documents": [d.summary() for d in (s.docs.values() if s else self.library.docs)],
             "limits": {"max_uploads": self.s.max_uploads, "max_upload_mb": round(self.s.max_upload_bytes / 1e6, 1),
-                       "max_doc_chars": self.s.max_doc_chars, "ttl_minutes": self.s.session_ttl_minutes,
-                       "uploads_left": self.s.max_uploads - (s.uploads if s else 0)},
+                       "ttl_minutes": self.s.session_ttl_minutes, "uploads_left": self.s.max_uploads - (s.uploads if s else 0)},
         }
 
-    # ---------- changes (each one copies the samples into a private session first) ----------
+    # --- changes (the first one copies the samples into a private session) ---
     def remove(self, sid: str, doc_id: str) -> dict:
         with self._lock:
             s = self._get_or_create(sid)
             if doc_id not in s.docs:
                 raise KeyError(doc_id)
             del s.docs[doc_id]
-            s.retriever = build_retriever(list(s.docs.values()), self.embedder)
+            s.index = self._build(s)
         return self.state(sid)
 
     def add(self, sid: str, filename: str, data: bytes) -> dict:
-        self._check_id(sid)
+        self._check(sid)
         name = safe_filename(filename)
         if len(data) > self.s.max_upload_bytes:
             raise ValueError(f"File too large (max {self.s.max_upload_bytes / 1e6:.1f} MB).")
         current = self._get(sid)
         if current and current.uploads >= self.s.max_uploads:
-            raise ValueError(f"Upload limit reached ({self.s.max_uploads} files per session). Reset to start over.")
-        text = extract_text(name, data)
-        truncated = len(text) > self.s.max_doc_chars
-        text = text[: self.s.max_doc_chars]
+            raise ValueError(f"Upload limit reached ({self.s.max_uploads} files). Reset to start over.")
+        text = extract_upload_text(name, data)
         title = name[: -len(suffix(name))] if suffix(name) else name
-
-        # embedding is the slow part, so do it outside the lock
-        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
-        doc_id = f"upload-{uuid.uuid4().hex[:8]}-{slug}"
-        chunks, vectors = index_document(doc_id, title, text, self.embedder, self.s)
-        if not chunks:
+        doc_id = f"upload-{uuid.uuid4().hex[:8]}-{re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')[:40]}"
+        doc = Document(doc_id, name, title, text[: self.s.max_doc_chars], "uploaded", len(text) > self.s.max_doc_chars)
+        indexed = embed_doc(doc, self.embedder, self.s)  # the slow part: outside the lock
+        if not indexed.chunks:
             raise ValueError("That file has too little text to index.")
-
         with self._lock:
             s = self._get_or_create(sid)
             if s.uploads >= self.s.max_uploads:
-                raise ValueError(f"Upload limit reached ({self.s.max_uploads} files per session). Reset to start over.")
+                raise ValueError(f"Upload limit reached ({self.s.max_uploads} files). Reset to start over.")
             s.uploads += 1
-            s.docs[doc_id] = Document(doc_id, name, title, text, "uploaded", truncated, chunks, vectors)
-            s.retriever = build_retriever(list(s.docs.values()), self.embedder)
+            s.docs[doc_id] = indexed
+            s.index = self._build(s)
         return self.state(sid)
 
     def reset(self, sid: str) -> dict:
-        self._check_id(sid)
+        self._check(sid)
         with self._lock:
             self._sessions.pop(sid, None)
         return self.state(None)
 
-    # ---------- internals ----------
-    def _check_id(self, sid):
+    # --- internals ---
+    def _build(self, s: Session) -> HybridIndex:
+        return HybridIndex.from_parts([(d.chunks, d.vectors) for d in s.docs.values()], self.embedder)
+
+    def _docs(self, sid):
+        s = self._get(sid)
+        return list(s.docs.values()) if s else self.library.docs
+
+    def _check(self, sid):
         if not sid or not SESSION_ID.match(sid):
             raise ValueError("Invalid session id.")
 
@@ -193,16 +213,15 @@ class SessionManager:
             return s
 
     def _get_or_create(self, sid: str) -> Session:
-        """Caller must hold the lock."""
-        self._check_id(sid)
+        """Caller holds the lock."""
+        self._check(sid)
         now = self.clock()
         self._expire(now)
         s = self._sessions.get(sid)
         if s is None:
             while len(self._sessions) >= self.s.max_sessions:
-                self._sessions.popitem(last=False)  # drop the least recently used
-            docs = OrderedDict((d.id, d) for d in self.library.docs)
-            s = Session(docs, build_retriever(list(docs.values()), self.embedder), now)
+                self._sessions.popitem(last=False)
+            s = Session(OrderedDict((d.doc.id, d) for d in self.library.docs), self.library.index, now)
             self._sessions[sid] = s
         s.last_used = now
         self._sessions.move_to_end(sid)

@@ -1,14 +1,16 @@
+# web
 fastapi>=0.115
 uvicorn[standard]>=0.30
 pydantic>=2.7
-numpy>=1.26
 python-dotenv>=1.0
-pypdf>=4.0  # read uploaded PDFs in the demo sandbox
-# retrieval
-qdrant-client>=1.12
+# retrieval (models run on CPU via ONNX)
+numpy>=1.26
 fastembed>=0.5
-# LLM (LangChain)
+qdrant-client>=1.12  # optional backend, used when QDRANT_URL is set (docker-compose)
+# documents
 langchain-text-splitters>=0.3
+pypdf>=4.0
+# answer generation (OpenAI and Gemini's OpenAI-compatible endpoint)
 langchain-openai>=0.2
 # observability
 langfuse>=3.0,<4

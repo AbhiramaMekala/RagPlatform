@@ -3,6 +3,7 @@
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+data/index/
 data/qdrant/
 data/traces.jsonl
 .DS_Store

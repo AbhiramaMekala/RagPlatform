@@ -1,16 +1,17 @@
 """Cross-encoder reranking: reads (question, chunk) together and scores true relevance.
 
 Retrievers are fast but approximate; the reranker is slower but much more precise,
-so we run it only on the ~20 fused candidates.
+so it only runs on the ~20 fused candidates.
 """
 from .models import Hit
 
 
 class CrossEncoderReranker:
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str, threads: int = 0):
         from fastembed.rerank.cross_encoder import TextCrossEncoder
 
-        self.model = TextCrossEncoder(model_name)
+        self.model = TextCrossEncoder(model_name, **({"threads": threads} if threads else {}))
+        list(self.model.rerank("warmup", ["warmup"]))  # load the ONNX session now, not on the first visitor's request
 
     def rerank(self, query: str, hits: list[Hit], top_k: int) -> list[Hit]:
         if not hits:

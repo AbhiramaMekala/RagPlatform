@@ -1,21 +1,21 @@
-"""The RAG pipeline — ties every module together. Read this file first.
+"""The RAG pipeline - read this file first.
 
 question
-  -> [guard.input]      block injection / unsafe, redact PII
-  -> [retrieve.dense]   Qdrant vector search      \
-  -> [retrieve.bm25]    keyword search             } hybrid retrieval
-  -> [fusion.rrf]       merge both ranked lists   /
-  -> [rerank]           cross-encoder picks best top_k
-  -> [guard.relevance]  nothing relevant? say "I don't know"
-  -> [generate]         LLM answer with [n] citations
-  -> [guard.grounding]  hallucination check
+  -> [guard.input]      block prompt injection / unsafe requests, redact personal data
+  -> [retrieve.dense]   vector search (meaning)       \
+  -> [retrieve.bm25]    keyword search (exact terms)   } hybrid retrieval
+  -> [fusion.rrf]       merge both ranked lists       /
+  -> [rerank]           cross-encoder keeps the best top_k
+  -> [guard.relevance]  nothing relevant? answer "I don't know" instead of guessing
+  -> [generate]         LLM answer citing [n] (fallback chain: visitor key -> Gemini -> extractive)
+  -> [guard.grounding]  hallucination check: is every sentence supported by the sources?
   -> answer + sources + trace
 """
 import logging
 
 from . import guardrails
+from .index import reciprocal_rank_fusion
 from .llm import ExtractiveGenerator, describe_error, redact_secrets
-from .retriever import reciprocal_rank_fusion
 from .tracing import Trace
 
 log = logging.getLogger("rag.pipeline")
@@ -23,20 +23,17 @@ IDK = "I don't know based on the provided documents."
 
 
 class RAGPipeline:
-    def __init__(self, settings, embedder, retriever, reranker, generator, traces):
-        self.s = settings
-        self.embedder, self.retriever, self.reranker, self.generator = embedder, retriever, reranker, generator
-        self.traces = traces
+    def __init__(self, settings, embedder, reranker, traces):
+        self.s, self.embedder, self.reranker, self.traces = settings, embedder, reranker, traces
+        self.fallback = ExtractiveGenerator(embedder)
 
-    def ask(self, question: str, retriever=None, generator=None, trace_meta: dict | None = None, persist: bool = True) -> dict:
-        """retriever/generator override the defaults for one request (a visitor's private documents,
-        the visitor's own API key). trace_meta is stored on the trace; persist=False keeps the trace
-        in memory only (not written to disk or exported to Langfuse)."""
+    def ask(self, question: str, index, generator, trace_meta: dict | None = None, persist: bool = True) -> dict:
+        """index: what to search (shared samples or a visitor's private set).
+        generator: who writes the answer for this request (see llm.LLMRouter).
+        persist=False keeps the trace in memory only (questions about private uploads)."""
         t = Trace(question)
         t.data.update(trace_meta or {})
-        t.persist = persist  # per request (requests run concurrently in worker threads)
-        retriever = retriever or self.retriever
-        generator = generator or self.generator
+        t.persist = persist
 
         # 1. input guardrail
         with t.span("guard.input") as sp:
@@ -47,11 +44,11 @@ class RAGPipeline:
         q = check.query
 
         # 2. hybrid retrieval
-        with t.span("retrieve.dense") as sp:
-            dense = retriever.dense(q, self.s.candidates)
+        with t.span("retrieve.dense", backend=index.backend) as sp:
+            dense = index.dense(q, self.s.candidates)
             sp["hits"] = len(dense)
         with t.span("retrieve.bm25") as sp:
-            keyword = retriever.keyword(q, self.s.candidates)
+            keyword = index.keyword(q, self.s.candidates)
             sp["hits"] = len(keyword)
         with t.span("fusion.rrf") as sp:
             fused = reciprocal_rank_fusion([dense, keyword])[: self.s.candidates]
@@ -62,7 +59,6 @@ class RAGPipeline:
             top = self.reranker.rerank(q, fused, self.s.top_k)
             best = top[0].score if top else None
             sp["best_score"] = round(best, 3) if best is not None else None
-
         sources = self._sources(top, dense, keyword)
 
         # 4. relevance guardrail
@@ -71,21 +67,20 @@ class RAGPipeline:
             sp["relevant"] = relevant
         if not relevant:
             return self._done(t, status="no_relevant_context", answer=IDK, sources=sources,
-                              guard={"input": "passed", "relevance": "no relevant documents found"})
+                              guard={"input": _input_note(check), "relevance": "no relevant documents found"})
 
-        # 5. generation (falls back to extractive if the LLM call fails)
+        # 5. generation
         llm_error = None
-        with t.span("generate", model=getattr(generator, "model", "")) as sp:
+        with t.span("generate") as sp:
             try:
                 gen = generator.generate(q, top)
-            except Exception as exc:
-                log.warning("LLM call failed, using extractive fallback: %s", describe_error(exc))
+            except Exception as exc:  # the chain already falls back; this is a last line of defence
                 llm_error = describe_error(exc)
-                gen = ExtractiveGenerator(self.embedder).generate(q, top)
-            sp.update(model=gen.model, provider=gen.provider, input_tokens=gen.input_tokens, output_tokens=gen.output_tokens,
-                      cost_usd=gen.cost_usd)
+                log.warning("LLM chain failed, using extractive fallback: %s", llm_error)
+                gen = self.fallback.generate(q, top)
+            sp.update(model=gen.model, provider=gen.provider, input_tokens=gen.input_tokens, output_tokens=gen.output_tokens)
 
-        # 6. output guardrail (hallucination check)
+        # 6. output guardrail
         with t.span("guard.grounding") as sp:
             if gen.text.strip().startswith("I don't know"):
                 g = guardrails.GroundingCheck(1.0, False, [])
@@ -96,51 +91,26 @@ class RAGPipeline:
 
         return self._done(
             t, status="answered", answer=gen.text, sources=sources, model=gen.model, provider=gen.provider,
-            llm_notes=[redact_secrets(n) for n in gen.notes],
+            llm_notes=[redact_secrets(n) for n in gen.notes], llm_error=llm_error,
             input_tokens=gen.input_tokens, output_tokens=gen.output_tokens, cost_usd=gen.cost_usd,
-            groundedness=g.score, hallucination=g.hallucination, llm_error=llm_error,
-            guard={"input": "passed" + (f" (redacted {', '.join(check.redactions)})" if check.redactions else ""),
-                   "relevance": "passed", "grounding": {"score": g.score, "flagged": g.hallucination, "unsupported": g.unsupported}},
+            groundedness=g.score, hallucination=g.hallucination,
+            guard={"input": _input_note(check), "relevance": "passed",
+                   "grounding": {"score": g.score, "flagged": g.hallucination, "unsupported": g.unsupported}},
         )
 
-    def _sources(self, top, dense, keyword):
-        dense_ids = {h.chunk.id for h in dense}
-        kw_ids = {h.chunk.id for h in keyword}
-        return [
-            {"n": i, "title": h.chunk.title, "source": h.chunk.source, "text": h.chunk.text,
-             "rerank_score": round(h.score, 3),
-             "found_by": [name for name, ids in (("dense", dense_ids), ("bm25", kw_ids)) if h.chunk.id in ids]}
-            for i, h in enumerate(top, start=1)
-        ]
+    @staticmethod
+    def _sources(top, dense, keyword):
+        dense_ids, kw_ids = {h.chunk.id for h in dense}, {h.chunk.id for h in keyword}
+        return [{"n": i, "title": h.chunk.title, "source": h.chunk.source, "text": h.chunk.text, "rerank_score": round(h.score, 3),
+                 "found_by": [name for name, ids in (("dense", dense_ids), ("bm25", kw_ids)) if h.chunk.id in ids]}
+                for i, h in enumerate(top, start=1)]
 
     def _done(self, t: Trace, **data) -> dict:
-        trace = t.finish(**{k: v for k, v in data.items() if k != "sources"})
-        self.traces.record(trace, persist=getattr(t, "persist", True))
+        trace = t.finish(**{k: v for k, v in data.items() if k not in ("sources", "guard")})
+        self.traces.record(trace, persist=t.persist)
         return {"answer": data["answer"], "status": data["status"], "sources": data.get("sources", []),
                 "guardrails": data.get("guard", {}), "trace": trace}
 
 
-def build_pipeline(settings) -> RAGPipeline:
-    """Create the real components (downloads models on first run) and index docs if needed."""
-    from .bm25 import BM25Index
-    from .embeddings import Embedder
-    from .ingest import ingest
-    from .llm import LLMRouter
-    from .reranker import CrossEncoderReranker
-    from .retriever import HybridRetriever
-    from .tracing import TraceStore
-    from .vectorstore import QdrantStore
-
-    embedder = Embedder(settings.embed_model)
-    store = QdrantStore(settings.qdrant_url, settings.qdrant_path, settings.collection)
-    if store.count() == 0:
-        ingest(settings, embedder, store)
-    bm25 = BM25Index(store.all_chunks())
-    reranker = CrossEncoderReranker(settings.rerank_model)
-    router = LLMRouter(settings, embedder)
-    log.info("LLM chain: visitor OpenAI key -> %d Gemini key(s) -> %s -> extractive fallback",
-             len(router.gemini), "server OpenAI key" if settings.openai_api_key else "(no server OpenAI key)")
-    traces = TraceStore(settings.traces_file, langfuse=settings.langfuse_enabled)
-    pipeline = RAGPipeline(settings, embedder, HybridRetriever(embedder, store, bm25), reranker, router.for_request(None), traces)
-    pipeline.router = router
-    return pipeline
+def _input_note(check) -> str:
+    return "passed" + (f" (redacted {', '.join(check.redactions)})" if check.redactions else "")

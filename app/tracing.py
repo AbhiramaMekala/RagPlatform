@@ -1,10 +1,10 @@
-"""Observability: per-request traces (each pipeline step timed), token cost, and aggregate metrics.
+"""Observability: every request produces one trace (each pipeline step timed, tokens, cost).
 
-Every request produces one trace. Traces are:
-  - kept in memory for the /traces and /metrics endpoints (and the demo UI),
-  - appended to data/traces.jsonl,
-  - exported to Langfuse if LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY are set.
-LangSmith: set LANGSMITH_TRACING=true + LANGSMITH_API_KEY and LangChain traces the LLM call automatically.
+Traces are:
+  - kept in memory for /api/traces, /api/metrics and the demo UI,
+  - logged to stdout as one JSON line (Cloud Run ships stdout to Cloud Logging, so they're searchable there),
+  - optionally appended to TRACES_FILE and exported to Langfuse (LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY).
+Traces about a visitor's private uploads are kept in memory only.
 """
 import json
 import logging
@@ -16,7 +16,7 @@ from collections import deque
 from contextlib import contextmanager
 from pathlib import Path
 
-log = logging.getLogger("rag.tracing")
+log = logging.getLogger("rag.trace")
 
 
 class Trace:
@@ -24,9 +24,10 @@ class Trace:
         self.id = uuid.uuid4().hex[:12]
         self.question = question
         self.started = time.perf_counter()
-        self.timestamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+        self.timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         self.spans: list[dict] = []
         self.data: dict = {}
+        self.persist = True
 
     @contextmanager
     def span(self, name: str, **meta):
@@ -40,44 +41,43 @@ class Trace:
 
     def finish(self, **data) -> dict:
         self.data.update(data)
-        return {
-            "id": self.id,
-            "timestamp": self.timestamp,
-            "question": self.question,
-            "total_ms": round((time.perf_counter() - self.started) * 1000, 1),
-            "spans": self.spans,
-            **self.data,
-        }
+        return {"id": self.id, "timestamp": self.timestamp, "question": self.question,
+                "total_ms": round((time.perf_counter() - self.started) * 1000, 1), "spans": self.spans, **self.data}
 
 
 class TraceStore:
-    def __init__(self, path: Path | None = None, keep: int = 500, langfuse: bool = False):
+    def __init__(self, path: str | Path | None = None, keep: int = 500, langfuse: bool = False, log_json: bool = True):
         self.recent: deque[dict] = deque(maxlen=keep)
-        self.path = path
-        self.langfuse = langfuse
+        self.path = Path(path) if path else None
+        self.langfuse, self.log_json = langfuse, log_json
+        self.cache_hits = 0
         self.lock = threading.Lock()
-        if path:
-            path.parent.mkdir(parents=True, exist_ok=True)
+        if self.path:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def record(self, trace: dict, persist: bool = True) -> None:
-        """persist=False: keep in memory only (used for visitors' private documents)."""
         with self.lock:
             self.recent.append(trace)
             if persist and self.path:
                 with self.path.open("a") as f:
                     f.write(json.dumps(trace) + "\n")
-        if persist and self.langfuse:
+        if not persist:
+            return
+        if self.log_json:
+            log.info(json.dumps({"message": "rag trace", "severity": "INFO", **_summary(trace)}))
+        if self.langfuse:
             export_to_langfuse(trace)
 
     def metrics(self) -> dict:
         with self.lock:
             traces = list(self.recent)
         if not traces:
-            return {"requests": 0}
+            return {"requests": 0, "cache_hits": self.cache_hits}
         lat = sorted(t["total_ms"] for t in traces)
         answered = [t for t in traces if t.get("status") == "answered"]
         return {
             "requests": len(traces),
+            "cache_hits": self.cache_hits,
             "blocked": sum(t.get("status") == "blocked" for t in traces),
             "no_answer": sum(t.get("status") == "no_relevant_context" for t in traces),
             "hallucination_flags": sum(bool(t.get("hallucination")) for t in answered),
@@ -86,6 +86,13 @@ class TraceStore:
             "tokens_total": sum(t.get("input_tokens", 0) + t.get("output_tokens", 0) for t in traces),
             "cost_usd_total": round(sum(t.get("cost_usd", 0) for t in traces), 6),
         }
+
+
+def _summary(trace: dict) -> dict:
+    """What goes to the logs: everything except retrieved text."""
+    keep = ("id", "question", "status", "total_ms", "model", "provider", "groundedness", "hallucination",
+            "input_tokens", "output_tokens", "cost_usd", "llm_notes")
+    return {**{k: trace[k] for k in keep if k in trace}, "spans": {s["name"]: s["ms"] for s in trace.get("spans", [])}}
 
 
 def _pct(sorted_values: list[float], p: int) -> float:
@@ -107,15 +114,11 @@ def export_to_langfuse(trace: dict) -> None:
             for s in trace["spans"]:
                 meta = {k: v for k, v in s.items() if k != "name"}
                 if s["name"] == "generate":
-                    gen = root.start_generation(
-                        name="generate",
-                        model=trace.get("model"),
-                        output=trace.get("answer"),
+                    root.start_generation(
+                        name="generate", model=trace.get("model"), output=trace.get("answer"),
                         usage_details={"input": trace.get("input_tokens", 0), "output": trace.get("output_tokens", 0)},
-                        cost_details={"total": trace.get("cost_usd", 0.0)},
-                        metadata=meta,
-                    )
-                    gen.end()
+                        cost_details={"total": trace.get("cost_usd", 0.0)}, metadata=meta,
+                    ).end()
                 else:
                     root.start_span(name=s["name"], metadata=meta).end()
             root.update(output={"answer": trace.get("answer"), "status": trace.get("status")})

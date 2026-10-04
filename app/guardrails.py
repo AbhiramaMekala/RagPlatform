@@ -68,9 +68,12 @@ def check_relevance(best_score: float | None, min_score: float) -> bool:
 # ---------- output guard: groundedness ----------
 
 def split_sentences(text: str) -> list[str]:
-    text = re.sub(r"\s+", " ", text).strip()
-    parts = re.split(r"(?<=[.!?])\s+(?=[A-Z\"'`(\[])", text)
-    return [p.strip() for p in parts if len(p.strip()) > 15]
+    """Sentences, treating each line (heading, list item) as its own unit."""
+    out = []
+    for line in text.splitlines():
+        line = re.sub(r"\s+", " ", line).strip().lstrip("-*• ").strip()
+        out += [p.strip() for p in re.split(r"(?<=[.!?])\s+(?=[A-Z\"'`(\[])", line) if len(p.strip()) > 15]
+    return out
 
 
 def _content_words(text: str) -> set[str]:

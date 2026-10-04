@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+venv
+.env
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.DS_Store
+data/index
+data/qdrant
+data/traces.jsonl
+tests
+loadtest
+*.md

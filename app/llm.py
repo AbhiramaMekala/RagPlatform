@@ -88,11 +88,6 @@ class ChatGenerator:
         return Generation(text.strip(), self.model, tin, tout, round((tin * pin + tout * pout) / 1_000_000, 6))
 
 
-# Backwards-compatible name
-def OpenAIGenerator(model: str, api_key: str) -> ChatGenerator:  # noqa: N802
-    return ChatGenerator(model, api_key, max_retries=1)
-
-
 class ExtractiveGenerator:
     """No-LLM fallback: returns the 3 context sentences most similar to the question, with citations."""
 

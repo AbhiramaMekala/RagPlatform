@@ -45,3 +45,10 @@ def test_made_up_answer_is_flagged():
     answer = "Constants must be declared with the const keyword. The compiler rejects lowercase constant names at runtime."
     g = check_grounding(answer, CONTEXT, FakeEmbedder(), sim_threshold=0.78, min_groundedness=0.7)
     assert g.hallucination and len(g.unsupported) == 2
+
+
+def test_sentences_split_on_lines_and_list_items():
+    from app.guardrails import split_sentences
+
+    text = "Approval limits\n- Purchases under $500 need your manager.\n- Purchases over $5,000 need the CFO. Always."
+    assert split_sentences(text) == ["Purchases under $500 need your manager.", "Purchases over $5,000 need the CFO."]

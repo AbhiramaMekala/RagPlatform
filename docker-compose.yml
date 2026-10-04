@@ -1,3 +1,5 @@
+# Local "production" setup: the API serves the sample index from a Qdrant server.
+# (The Cloud Run demo uses the built-in in-memory index instead: nothing extra to run or pay for.)
 services:
   qdrant:
     image: qdrant/qdrant:latest
