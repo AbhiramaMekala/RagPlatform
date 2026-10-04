@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  /* Same black-and-white system as abhirama.tech. Sections are separated by lines, not boxes.
+  /* Same black-and-white system as abhirama.tech. Everything is separated by simple lines, no floating boxes.
      Colour only explains: yellow = citation, green = check passed, red = blocked / unsupported,
      amber = quoted without a model, blue = selected / yours. */
   :root {
@@ -20,7 +20,7 @@
     --good: #22c55e; --bad: #f87171; --warn: #fbbf24; --info: #60a5fa; --info-soft: rgba(96, 165, 250, 0.14);
     --font: "Inter", "Aptos", "Segoe UI", system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-    --r-sm: 10px; --r-pill: 999px; --wrap: 1200px; --gutter: 32px;
+    --r-sm: 10px; --r-pill: 999px; --pad: 24px;
     color-scheme: dark;
   }
   @media (prefers-color-scheme: light) {
@@ -51,137 +51,141 @@
   .hidden { display: none !important; }
   .mono { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.02em; color: var(--faint); }
   .num { font-variant-numeric: tabular-nums; }
-  .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); }
-  @media (max-width: 720px) { :root { --gutter: 16px; } }
 
-  /* ================= header: back button, then the project name ================= */
-  .top { border-bottom: 1px solid var(--line); }
-  .top .wrap { display: flex; align-items: center; gap: 20px; min-height: 72px; flex-wrap: wrap; padding-top: 12px; padding-bottom: 12px; }
-  .back { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--line-strong); border-radius: var(--r-pill);
-          text-decoration: none; font-size: 0.86rem; font-weight: 600; white-space: nowrap; transition: background .15s, color .15s, border-color .15s; }
-  .back:hover { background: var(--text); color: var(--bg); border-color: var(--text); }
-  .back svg { width: 15px; height: 15px; }
-  .title { flex: 1 1 260px; min-width: 0; padding-left: 20px; border-left: 1px solid var(--line); }
-  .title h1 { margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
-  .title p { margin: 2px 0 0; color: var(--muted); font-size: 0.86rem; }
-  .src { font-size: 0.86rem; font-weight: 500; color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
-  .src:hover { color: var(--text); border-color: var(--text); }
-  @media (max-width: 720px) { .title { padding-left: 0; border-left: 0; flex-basis: 100%; order: 3; } }
+  /* ================= header: Home | title | Source code, split by lines ================= */
+  .top { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
+  .top-back { display: flex; align-items: center; gap: 8px; padding: 0 var(--pad); border-right: 1px solid var(--line); text-decoration: none;
+              font-size: 0.88rem; font-weight: 600; white-space: nowrap; transition: background .15s, color .15s; }
+  .top-back:hover { background: var(--text); color: var(--bg); }
+  .top-back svg { width: 16px; height: 16px; }
+  .top-title { flex: 1; min-width: 0; padding: 16px var(--pad); }
+  .top-title h1 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; }
+  .top-title p { margin: 2px 0 0; color: var(--muted); font-size: 0.86rem; }
+  .top-link { display: flex; align-items: center; padding: 0 var(--pad); border-left: 1px solid var(--line); font-size: 0.86rem; font-weight: 500;
+              color: var(--muted); text-decoration: none; white-space: nowrap; transition: background .15s, color .15s; }
+  .top-link:hover { background: var(--text); color: var(--bg); }
+  @media (max-width: 640px) { :root { --pad: 16px; } .top-title p { display: none; } .top-title { padding: 14px var(--pad); } }
 
-  /* ================= sections: separated by a line, label on the left, content on the right ================= */
-  .section { border-bottom: 1px solid var(--line); }
-  .section .wrap { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 32px; padding-top: 32px; padding-bottom: 32px; }
-  .label { min-width: 0; }
-  .label .n { font: 500 0.78rem/1 var(--mono); color: var(--faint); }
-  .label h2 { margin: 8px 0 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
-  .label p { margin: 6px 0 0; color: var(--muted); font-size: 0.86rem; line-height: 1.5; }
-  .content { min-width: 0; }
-  @media (max-width: 860px) { .section .wrap { grid-template-columns: 1fr; gap: 16px; padding-top: 24px; padding-bottom: 24px; } }
+  /* ================= two columns split by a line; sections split by lines ================= */
+  .layout { display: grid; grid-template-columns: minmax(320px, 420px) minmax(0, 1fr); align-items: stretch; }
+  .col { min-width: 0; }
+  .col-left { border-right: 1px solid var(--line); }
+  .section { padding: var(--pad); border-bottom: 1px solid var(--line); }
+  .col-right .section:last-of-type { border-bottom: 0; }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .col-left { border-right: 0; } .col-right .section:last-of-type { border-bottom: 1px solid var(--line); } }
+
+  .head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 14px; margin-bottom: 18px; }
+  .step { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-strong); display: grid; place-items: center;
+          font: 500 0.78rem/1 var(--mono); color: var(--muted); }
+  .head-title { flex: 1 1 150px; min-width: 0; }
+  .head-title h2 { margin: 2px 0 0; font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
+  .head-title p { margin: 2px 0 0; color: var(--muted); font-size: 0.84rem; line-height: 1.45; }
+  .head-aside { flex: none; align-self: center; }
+  .sub { margin: 20px 0 10px; font-size: 0.86rem; font-weight: 700; }
+  .placeholder { margin: 0; color: var(--faint); font-size: 0.88rem; }
 
   .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--text); background: var(--text); color: var(--bg); border-radius: var(--r-pill);
-         padding: 9px 18px; font-weight: 600; font-size: 0.88rem; cursor: pointer; white-space: nowrap; transition: opacity .15s; }
+         padding: 8px 16px; font-weight: 600; font-size: 0.86rem; cursor: pointer; white-space: nowrap; transition: opacity .15s; }
   .btn:hover { opacity: .85; }
   .btn:disabled { opacity: .5; cursor: progress; }
   .btn-line { background: transparent; color: var(--text); border-color: var(--line-strong); }
   .btn-line:hover { border-color: var(--text); opacity: 1; }
   .link-btn { background: none; border: 0; padding: 0; color: var(--text); font-size: 0.84rem; font-weight: 600; border-bottom: 1px solid var(--line-strong); cursor: pointer; }
   .link-btn:hover { border-color: var(--text); }
-  .empty { margin: 0; color: var(--faint); font-size: 0.9rem; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; display: inline-block; }
   .dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); } .dot.info { background: var(--info); }
 
   /* ---------- 1. knowledge base ---------- */
-  .kb-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .kb-count { font-size: 0.92rem; color: var(--muted); }
+  .kb-count { margin: 0 0 12px; font-size: 0.88rem; color: var(--muted); }
   .kb-count b { color: var(--text); }
-  .kb-actions { display: flex; align-items: center; gap: 16px; }
-  .docs { list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--line); }
-  .doc { display: grid; grid-template-columns: 44px 1fr auto auto; gap: 12px; align-items: center; padding: 11px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
-  .doc:hover .doc-title { text-decoration: underline; text-underline-offset: 3px; }
+  .kb-box { border: 1px dashed var(--line-strong); border-radius: 14px; padding: 8px; transition: border-color .15s, background .15s; }
+  .kb-box.over { border-color: var(--info); background: var(--info-soft); }
+  .docs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .doc { display: grid; grid-template-columns: 30px 1fr auto; gap: 0 10px; align-items: start; padding: 8px; border-radius: 10px; cursor: pointer; transition: background .15s; }
+  .doc:hover { background: var(--surface-2); }
+  .doc.open { background: var(--info-soft); }
   .doc.open .doc-title { color: var(--info); }
-  .doc-ext { font: 500 0.72rem/1 var(--mono); color: var(--faint); }
-  .doc-title { background: none; border: 0; padding: 0; text-align: left; font-size: 0.92rem; font-weight: 600; cursor: pointer; min-width: 0; }
-  .doc-meta { font-size: 0.8rem; color: var(--faint); white-space: nowrap; }
-  .tag { font-size: 0.7rem; font-weight: 600; padding: 1px 8px; border-radius: var(--r-pill); border: 1px solid var(--line-strong); color: var(--muted); margin-right: 8px; }
+  .doc-icon { width: 30px; height: 34px; border: 1px solid var(--line-strong); border-radius: 4px; display: grid; place-items: center; font: 600 9px/1 var(--mono); color: var(--faint); }
+  .doc-main { min-width: 0; }
+  .doc-title { display: block; width: 100%; background: none; border: 0; padding: 0; text-align: left; font-size: 0.88rem; font-weight: 600; line-height: 1.35; cursor: pointer; }
+  .doc-meta { display: block; margin-top: 3px; font-size: 0.75rem; color: var(--faint); }
+  .tag { font-size: 0.68rem; font-weight: 600; padding: 1px 7px; border-radius: var(--r-pill); border: 1px solid var(--line-strong); color: var(--muted); margin-right: 6px; }
   .tag.yours { border-color: var(--info); color: var(--info); }
-  .doc-rm { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 0.82rem; padding: 4px 6px; border-radius: 6px; }
-  .doc-rm:hover { color: var(--bad); }
-  @media (max-width: 560px) { .doc { grid-template-columns: 1fr auto; } .doc-ext { display: none; } .doc-meta { grid-column: 1; grid-row: 2; } .doc-rm { grid-row: 1 / span 2; grid-column: 2; } }
-  .drop { margin-top: 16px; padding: 16px; border: 1px dashed var(--line-strong); border-radius: var(--r-sm); text-align: center; font-size: 0.86rem; color: var(--muted); transition: border-color .15s, background .15s; }
-  .drop.over { border-color: var(--info); background: var(--info-soft); color: var(--text); }
-  .drop small { display: block; margin-top: 2px; font-size: 0.76rem; color: var(--faint); }
-  .kb-msg { font-size: 0.84rem; margin: 10px 0 0; min-height: 1.3em; color: var(--muted); }
+  .doc-rm { background: none; border: 0; color: var(--faint); cursor: pointer; width: 28px; height: 28px; border-radius: 8px; font-size: 18px; line-height: 1; }
+  .doc-rm:hover { color: var(--bad); background: var(--surface-2); }
+  .drop { margin: 6px 0 0; padding: 12px 8px 6px; text-align: center; font-size: 0.84rem; color: var(--muted); }
+  .drop small { display: block; margin-top: 2px; font-size: 0.74rem; color: var(--faint); }
+  .kb-msg { font-size: 0.82rem; margin: 10px 0 0; min-height: 1.3em; color: var(--muted); }
   .kb-msg.err { color: var(--bad); } .kb-msg.ok { color: var(--good); }
-  .kb-note { margin: 4px 0 0; font-size: 0.8rem; color: var(--faint); }
+  .kb-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; font-size: 0.78rem; color: var(--faint); }
+  .kb-foot p { margin: 0; flex: 1 1 200px; }
 
   /* ---------- 2. configuration ---------- */
-  .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-  @media (max-width: 860px) { .fields { grid-template-columns: 1fr; } }
   .field { display: block; min-width: 0; }
-  .field > span { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; }
-  .field input, .field select, .field .fixed { width: 100%; height: 44px; border: 1px solid var(--line-strong); background: var(--bg); border-radius: var(--r-sm); padding: 0 12px; font-size: 0.9rem; }
+  .field + .field { margin-top: 14px; }
+  .field > span { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; }
+  .field input, .field select { width: 100%; height: 44px; border: 1px solid var(--line-strong); background: var(--bg); border-radius: var(--r-sm); padding: 0 12px; font-size: 0.9rem; }
   .field select { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 38px;
     background-image: linear-gradient(45deg, transparent 50%, var(--text) 50%), linear-gradient(135deg, var(--text) 50%, transparent 50%);
     background-position: calc(100% - 20px) 52%, calc(100% - 15px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
   .field select option { background: var(--surface); color: var(--text); }
   .field input:focus, .field select:focus { border-color: var(--text); outline: none; }
-  .field input:disabled { opacity: .45; cursor: not-allowed; }
-  .fixed { display: flex; align-items: center; color: var(--muted); }
-  .status { display: flex; gap: 10px; align-items: baseline; margin: 16px 0 0; font-size: 0.88rem; color: var(--muted); }
+  .field input:disabled, .field select:disabled { opacity: .45; cursor: not-allowed; }
+  .fine { font-size: 0.78rem; color: var(--faint); margin: 10px 0 0; line-height: 1.5; }
+  .status { display: flex; gap: 10px; align-items: baseline; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 0.84rem; color: var(--muted); }
   .status b { color: var(--text); }
-  .fine { font-size: 0.8rem; color: var(--faint); margin: 8px 0 0; }
 
   /* ---------- 3. ask ---------- */
   .ask { display: flex; gap: 8px; padding: 6px 6px 6px 18px; border: 1px solid var(--line-strong); border-radius: var(--r-pill); }
   .ask:focus-within { border-color: var(--text); }
   .ask input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 1rem; padding: 8px 0; }
-  .tries-label { font-size: 0.82rem; color: var(--faint); margin: 16px 0 8px; }
+  .tries-label { font-size: 0.8rem; color: var(--faint); margin: 14px 0 8px; }
   .tries { display: flex; flex-wrap: wrap; gap: 6px; }
   .try { border: 1px solid var(--line-strong); background: transparent; border-radius: var(--r-pill); padding: 6px 12px; font-size: 0.82rem; color: var(--muted); cursor: pointer; text-align: left; }
   .try:hover { color: var(--text); border-color: var(--text); }
   .try.probe { border-style: dashed; }
-  .using { margin: 16px 0 0; font-size: 0.82rem; color: var(--faint); }
+  .using { margin: 14px 0 0; font-size: 0.8rem; color: var(--faint); }
   .using b { color: var(--muted); font-weight: 600; }
 
   /* ---------- 4. answer ---------- */
-  .answer-by { margin: 0 0 10px; }
-  .answer { font-size: 1.15rem; line-height: 1.65; margin: 0; white-space: pre-wrap; max-width: 75ch; }
+  .answer { font-size: 1.1rem; line-height: 1.65; margin: 0; white-space: pre-wrap; max-width: 75ch; }
   .answer.muted { color: var(--muted); }
   .cite { font: 700 0.72rem/1 var(--font); background: var(--cite); color: var(--cite-ink); border: 0; border-radius: 5px; padding: 3px 6px; margin: 0 2px; vertical-align: 2px; cursor: pointer; }
-  .checks { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 18px 0 0; padding: 0; list-style: none; font-size: 0.84rem; color: var(--muted); }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 16px 0 0; padding: 0; list-style: none; font-size: 0.82rem; color: var(--muted); }
   .checks li { display: inline-flex; align-items: center; gap: 7px; }
-  .note { margin: 12px 0 0; font-size: 0.86rem; color: var(--warn); }
+  .note { margin: 12px 0 0; font-size: 0.84rem; color: var(--warn); }
   .note.bad { color: var(--bad); }
 
   /* ---------- 5. sources ---------- */
   .passages { border-top: 1px solid var(--line); }
-  .passage { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 12px; padding: 16px 4px; border-bottom: 1px solid var(--line); }
+  .passage { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 0 10px; padding: 14px 0; border-bottom: 1px solid var(--line); }
   .passage.flash { animation: flash 1.4s ease; }
   @keyframes flash { 0%, 45% { background: var(--cite-soft); } }
   .passage .cite { cursor: default; margin: 2px 0 0; justify-self: start; align-self: start; }
-  .passage-head { display: flex; align-items: baseline; gap: 6px 12px; flex-wrap: wrap; }
-  .passage-title { font-weight: 600; font-size: 0.92rem; }
-  .passage-meta { font-size: 0.78rem; color: var(--faint); }
+  .passage-head { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; }
+  .passage-title { font-weight: 600; font-size: 0.9rem; }
+  .passage-meta { font-size: 0.76rem; color: var(--faint); }
   .passage-text { margin: 6px 0 0; font-size: 0.9rem; color: var(--muted); white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .passage-text.full { -webkit-line-clamp: unset; }
   .passage-actions { display: flex; gap: 18px; margin-top: 8px; }
 
   /* ---------- 6. trace ---------- */
   .steps { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-  .trace-step { display: grid; grid-template-columns: 190px 1fr 74px; gap: 14px; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--line); font-size: 0.86rem; }
-  .trace-step small { display: block; color: var(--faint); font-size: 0.74rem; line-height: 1.2; }
+  .trace-step { display: grid; grid-template-columns: 170px 1fr 74px; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.84rem; }
+  .trace-step small { display: block; color: var(--faint); font-size: 0.72rem; line-height: 1.2; }
   .track { position: relative; height: 6px; background: var(--surface-2); border-radius: 3px; }
   .bar { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--muted); min-width: 3px; }
   .bar.guard { background: var(--good); } .bar.gen { background: var(--info); } .bar.stop { background: var(--bad); }
   .ms { text-align: right; }
-  .trace-foot { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 12px; font-size: 0.82rem; color: var(--muted); }
+  .trace-foot { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 12px; font-size: 0.8rem; color: var(--muted); }
   .trace-foot b { color: var(--text); font-weight: 600; }
-  .how { margin: 0; padding-left: 20px; color: var(--muted); font-size: 0.9rem; }
+  .how { margin: 0; padding-left: 20px; color: var(--muted); font-size: 0.86rem; }
   .how li { margin: 4px 0; }
-  @media (max-width: 560px) { .trace-step { grid-template-columns: 116px 1fr 58px; gap: 8px; } }
+  @media (max-width: 560px) { .trace-step { grid-template-columns: 112px 1fr 58px; gap: 8px; } }
 
-  .foot .wrap { padding-top: 20px; padding-bottom: 32px; display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.8rem; color: var(--faint); }
-  .foot b { color: var(--text); font-weight: 600; }
+  .stats { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 14px var(--pad) 24px; font-size: 0.8rem; color: var(--faint); border-top: 1px solid var(--line); }
+  .stats:empty { display: none; }
+  .stats b { color: var(--text); font-weight: 600; }
 
   /* ---------- document viewer ---------- */
   .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; }
@@ -189,12 +193,12 @@
   .drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(680px, 100%); background: var(--bg); border-left: 1px solid var(--line); z-index: 11;
             visibility: hidden; transform: translateX(102%); transition: transform .24s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .24s; display: flex; flex-direction: column; }
   .drawer.on { transform: none; visibility: visible; transition-delay: 0s; }
-  .drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--line); }
+  .drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px var(--pad); border-bottom: 1px solid var(--line); }
   .drawer-head h2 { margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.3; }
-  .drawer-body { overflow: auto; padding: 20px 24px 48px; }
+  .drawer-body { overflow: auto; padding: var(--pad) var(--pad) 48px; }
   .doc-text { font: 0.95rem/1.75 var(--font); white-space: pre-wrap; word-break: break-word; margin: 0; max-width: 72ch; color: var(--muted); }
   mark { background: var(--cite); color: var(--cite-ink); border-radius: 3px; padding: 1px 2px; }
-  .hint { display: flex; gap: 8px; align-items: center; font-size: 0.84rem; margin: 0 0 16px; padding: 9px 12px; border-radius: var(--r-sm); background: var(--cite-soft); }
+  .hint { display: flex; gap: 8px; align-items: center; font-size: 0.82rem; margin: 0 0 16px; padding: 9px 12px; border-radius: var(--r-sm); background: var(--cite-soft); }
   .hint .cite { cursor: default; }
 
   @media (prefers-reduced-motion: reduce) { .drawer, .scrim { transition: none; } .passage.flash { animation: none; } }
@@ -202,127 +206,119 @@
 </head>
 <body>
 <header class="top">
-  <div class="wrap">
-    <a class="back" href="https://abhirama.tech/#projects" target="_top">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-      Back to portfolio
-    </a>
-    <div class="title">
-      <h1>Production RAG Platform</h1>
-      <p>Ask a question about a knowledge base. Every answer shows the passages it came from.</p>
-    </div>
-    <a class="src" href="https://github.com/AbhiramaMekala/RagPlatform" target="_blank" rel="noreferrer">Source code</a>
+  <a class="top-back" href="https://abhirama.tech/#projects" target="_top">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    Home
+  </a>
+  <div class="top-title">
+    <h1>Production RAG Platform</h1>
+    <p>Ask a question about a knowledge base. Every answer shows the passages it came from.</p>
   </div>
+  <a class="top-link" href="https://github.com/AbhiramaMekala/RagPlatform" target="_blank" rel="noreferrer">Source code</a>
 </header>
 
-<main>
-  <!-- 1. Knowledge base -->
-  <section class="section" aria-labelledby="t-kb">
-    <div class="wrap">
-      <div class="label"><span class="n">01</span><h2 id="t-kb">Knowledge base</h2><p>The documents the assistant searches. Click a document to read it.</p></div>
-      <div class="content">
-        <div class="kb-bar">
-          <span class="kb-count"><b class="num" id="kb-docs">–</b> documents, <b class="num" id="kb-passages">–</b> searchable passages</span>
-          <span class="kb-actions">
-            <button type="button" class="link-btn hidden" id="reset">Restore original documents</button>
-            <label class="btn btn-line" for="file" id="add-btn">+ Add documents</label>
-            <input type="file" id="file" class="hidden" multiple accept=".txt,.md,.markdown,.rst,.csv,.pdf,.docx">
-          </span>
+<div class="layout">
+  <!-- ================= left: knowledge base, then configuration ================= -->
+  <div class="col col-left">
+    <section class="section" aria-labelledby="t-kb">
+      <div class="head">
+        <span class="step" aria-hidden="true">1</span>
+        <div class="head-title"><h2 id="t-kb">Knowledge base</h2><p>The documents the assistant searches. Click one to read it.</p></div>
+        <div class="head-aside">
+          <label class="btn btn-line" for="file" id="add-btn">+ Add documents</label>
+          <input type="file" id="file" class="hidden" multiple accept=".txt,.md,.markdown,.rst,.csv,.pdf,.docx">
         </div>
+      </div>
+      <p class="kb-count"><b class="num" id="kb-docs">–</b> documents, <b class="num" id="kb-passages">–</b> searchable passages</p>
+      <div class="kb-box" id="kb-box">
         <ul class="docs" id="docs"></ul>
-        <div class="drop" id="drop">Drop files here to add them to the knowledge base<small id="drop-limits">.txt .md .pdf .docx, up to 2 MB each</small></div>
-        <p class="kb-msg" id="kb-msg" role="status"></p>
-        <p class="kb-note" id="kb-note"></p>
+        <div class="drop" id="drop">Drop files here to add them<small id="drop-limits">.txt .md .pdf .docx, up to 2 MB each</small></div>
       </div>
-    </div>
-  </section>
-
-  <!-- 2. Configuration -->
-  <section class="section" aria-labelledby="t-config">
-    <div class="wrap">
-      <div class="label"><span class="n">02</span><h2 id="t-config">Configuration</h2><p>Choose who writes the answer. Search, ranking and the safety checks always run here.</p></div>
-      <div class="content">
-        <div class="fields">
-          <label class="field"><span>Provider</span>
-            <select id="provider">
-              <option value="anthropic">Anthropic (your key)</option>
-              <option value="openai">OpenAI (your key)</option>
-              <option value="gemini">Google Gemini (demo keys)</option>
-              <option value="none">No model (quotes)</option>
-            </select></label>
-          <label class="field"><span>Model</span><select id="model"></select></label>
-          <label class="field"><span id="key-label">API key</span><input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></label>
-        </div>
-        <p class="status" id="status"><span class="dot"></span><span id="status-text"></span></p>
-        <p class="fine" id="key-note">Your key stays in this tab's memory only. It's sent with each question over HTTPS, used for that question, and never stored or logged.</p>
+      <p class="kb-msg" id="kb-msg" role="status"></p>
+      <div class="kb-foot">
+        <p id="kb-note">Changes are private to you and reset when you reload.</p>
+        <button type="button" class="link-btn hidden" id="reset">Restore original documents</button>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 3. Ask -->
-  <section class="section" aria-labelledby="t-ask">
-    <div class="wrap">
-      <div class="label"><span class="n">03</span><h2 id="t-ask">Ask a question</h2><p>About the documents in the knowledge base.</p></div>
-      <div class="content">
-        <form class="ask" id="ask-form" role="search">
-          <input id="q" type="text" autocomplete="off" placeholder="Ask about the knowledge base…" aria-label="Your question" maxlength="500">
-          <button class="btn" id="go">Ask</button>
-        </form>
-        <p class="tries-label" id="tries-label"></p>
-        <div class="tries" id="tries"></div>
-        <p class="using" id="using"></p>
+    <section class="section" aria-labelledby="t-config">
+      <div class="head">
+        <span class="step" aria-hidden="true">2</span>
+        <div class="head-title"><h2 id="t-config">LLM configuration</h2><p>Who writes the answer. Search, ranking and the safety checks always run here.</p></div>
       </div>
-    </div>
-  </section>
+      <label class="field"><span>Answer model</span>
+        <select id="provider">
+          <option value="anthropic">Anthropic</option>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="none">No model</option>
+        </select></label>
+      <label class="field"><span>Model</span><select id="model"></select></label>
+      <label class="field"><span id="key-label">API key</span><input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></label>
+      <p class="fine" id="key-note">Your key stays in this tab's memory only. It's sent with each question over HTTPS, used for that question, and never stored or logged.</p>
+      <p class="status" id="status"><span class="dot"></span><span id="status-text"></span></p>
+    </section>
+  </div>
 
-  <!-- 4. Answer -->
-  <section class="section" aria-labelledby="t-answer" aria-live="polite">
-    <div class="wrap">
-      <div class="label"><span class="n">04</span><h2 id="t-answer">Answer</h2><p>Written only from the sources below, with numbered citations, then fact-checked sentence by sentence.</p></div>
-      <div class="content">
-        <p class="empty" id="answer-empty">Ask a question to see the answer here.</p>
-        <div id="answer-box" class="hidden">
-          <p class="answer-by mono" id="answer-by"></p>
-          <p class="answer" id="answer"></p>
-          <ul class="checks" id="checks"></ul>
-          <p class="note hidden" id="why"></p>
-          <p class="note bad hidden" id="unsupported"></p>
-        </div>
+  <!-- ================= right: ask, answer, sources, trace ================= -->
+  <div class="col col-right">
+    <section class="section" aria-labelledby="t-ask">
+      <div class="head">
+        <span class="step" aria-hidden="true">3</span>
+        <div class="head-title"><h2 id="t-ask">Ask a question</h2><p>About the documents in the knowledge base.</p></div>
       </div>
-    </div>
-  </section>
+      <form class="ask" id="ask-form" role="search">
+        <input id="q" type="text" autocomplete="off" placeholder="Ask about the knowledge base…" aria-label="Your question" maxlength="500">
+        <button class="btn" id="go">Ask</button>
+      </form>
+      <p class="tries-label" id="tries-label"></p>
+      <div class="tries" id="tries"></div>
+      <p class="using" id="using"></p>
+    </section>
 
-  <!-- 5. Sources -->
-  <section class="section" aria-labelledby="t-sources">
-    <div class="wrap">
-      <div class="label"><span class="n">05</span><h2 id="t-sources">Sources, ranked</h2><p>Found by two searches (meaning and exact words), merged, then reranked. Most relevant first.</p></div>
-      <div class="content">
-        <p class="empty" id="sources-empty">The passages behind the answer will appear here.</p>
-        <div class="passages hidden" id="passages"></div>
+    <section class="section" aria-labelledby="t-answer" aria-live="polite">
+      <div class="head">
+        <span class="step" aria-hidden="true">4</span>
+        <div class="head-title"><h2 id="t-answer">Answer</h2><p>Written only from the sources below, with numbered citations, then fact-checked.</p></div>
+        <span class="head-aside mono" id="answer-by"></span>
       </div>
-    </div>
-  </section>
-
-  <!-- 6. Pipeline trace -->
-  <section class="section" aria-labelledby="t-trace">
-    <div class="wrap">
-      <div class="label"><span class="n">06</span><h2 id="t-trace">Pipeline trace</h2><p>Every step of the request, timed.</p></div>
-      <div class="content">
-        <ol class="how" id="how">
-          <li>Input check: blocks prompt injection and hides personal data.</li>
-          <li>Search by meaning and search by exact words run side by side.</li>
-          <li>The two result lists are merged, then a reranking model keeps the best four.</li>
-          <li>Relevance check: if nothing relevant was found, it declines instead of guessing.</li>
-          <li>The answer is written from those passages, then every sentence is fact-checked.</li>
-        </ol>
-        <ol class="steps hidden" id="steps"></ol>
-        <div class="trace-foot num hidden" id="trace-foot"></div>
+      <p class="placeholder" id="answer-empty">Ask a question to see the answer here.</p>
+      <div id="answer-box" class="hidden">
+        <p class="answer" id="answer"></p>
+        <ul class="checks" id="checks"></ul>
+        <p class="note hidden" id="why"></p>
+        <p class="note bad hidden" id="unsupported"></p>
       </div>
-    </div>
-  </section>
-</main>
+    </section>
 
-<footer class="foot"><div class="wrap num" id="stats"></div></footer>
+    <section class="section" aria-labelledby="t-sources">
+      <div class="head">
+        <span class="step" aria-hidden="true">5</span>
+        <div class="head-title"><h2 id="t-sources">Sources, ranked</h2><p>Found by two searches (meaning and exact words), merged, then reranked. Most relevant first.</p></div>
+      </div>
+      <p class="placeholder" id="sources-empty">The passages behind the answer will appear here.</p>
+      <div class="passages hidden" id="passages"></div>
+    </section>
+
+    <section class="section" aria-labelledby="t-trace">
+      <div class="head">
+        <span class="step" aria-hidden="true">6</span>
+        <div class="head-title"><h2 id="t-trace">Pipeline trace</h2><p>Every step of the request, timed.</p></div>
+      </div>
+      <ol class="how" id="how">
+        <li>Input check: blocks prompt injection and hides personal data.</li>
+        <li>Search by meaning and search by exact words run side by side.</li>
+        <li>The two result lists are merged, then a reranking model keeps the best four.</li>
+        <li>Relevance check: if nothing relevant was found, it declines instead of guessing.</li>
+        <li>The answer is written from those passages, then every sentence is fact-checked.</li>
+      </ol>
+      <ol class="steps hidden" id="steps"></ol>
+      <div class="trace-foot num hidden" id="trace-foot"></div>
+    </section>
+
+    <div class="stats num" id="stats"></div>
+  </div>
+</div>
 
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title" tabindex="-1">
@@ -373,7 +369,7 @@ async function api(path, opts = {}) {
 }
 const kbMsg = (msg, kind = "") => { $("kb-msg").textContent = msg; $("kb-msg").className = "kb-msg" + (kind ? " " + kind : ""); };
 
-// ================= 01 knowledge base =================
+// ================= 1. knowledge base =================
 async function loadState() {
   try {
     const st = await api(`/api/state?session=${SID}`);
@@ -393,17 +389,17 @@ function renderKB(st) {
   $("drop").classList.toggle("hidden", left <= 0);
   $("drop-limits").textContent = `.txt .md .pdf .docx, up to ${L.max_upload_mb ?? 2} MB each. ${left} more file${left === 1 ? "" : "s"} allowed.`;
   $("kb-note").textContent = st.custom
-    ? `You're using your own copy of the knowledge base. Others still see the originals; yours resets when you reload or after ${L.ttl_minutes ?? 30} idle minutes.`
+    ? `You're using your own copy. Others still see the originals; yours resets when you reload or after ${L.ttl_minutes ?? 30} idle minutes.`
     : "Adding or removing documents changes only your private copy. Please don't upload anything sensitive.";
   $("docs").innerHTML = docs.length ? docs.map((d) => {
     const ext = (d.name.match(/\.([a-z0-9]+)$/i) || [, "doc"])[1].slice(0, 4).toLowerCase();
     return `<li class="doc${openDocId === d.id ? " open" : ""}" data-open="${esc(d.id)}">
-      <span class="doc-ext" aria-hidden="true">.${esc(ext)}</span>
-      <button type="button" class="doc-title" data-open="${esc(d.id)}">${esc(d.title)}</button>
-      <span class="doc-meta"><span class="tag${d.origin === "uploaded" ? " yours" : ""}">${d.origin === "uploaded" ? "Yours" : "Sample"}</span>${d.chunks} passage${d.chunks === 1 ? "" : "s"}${d.truncated ? ", truncated" : ""}</span>
-      <button type="button" class="doc-rm" data-remove="${esc(d.id)}" aria-label="Remove ${esc(d.title)}">Remove</button>
+      <span class="doc-icon" aria-hidden="true">${esc(ext)}</span>
+      <span class="doc-main"><button type="button" class="doc-title" data-open="${esc(d.id)}">${esc(d.title)}</button>
+        <span class="doc-meta"><span class="tag${d.origin === "uploaded" ? " yours" : ""}">${d.origin === "uploaded" ? "Yours" : "Sample"}</span>${d.chunks} passage${d.chunks === 1 ? "" : "s"}${d.truncated ? ", truncated" : ""}</span></span>
+      <button type="button" class="doc-rm" data-remove="${esc(d.id)}" aria-label="Remove ${esc(d.title)}" title="Remove from the knowledge base">×</button>
     </li>`;
-  }).join("") : `<li class="doc"><span></span><span class="empty">The knowledge base is empty. Add documents, or restore the originals.</span></li>`;
+  }).join("") : `<li class="doc"><span></span><span class="placeholder">The knowledge base is empty. Add documents, or restore the originals.</span></li>`;
   renderTries();
 }
 
@@ -448,10 +444,10 @@ async function addFiles(files) {
   }
 }
 $("file").onchange = (e) => { const files = [...e.target.files]; e.target.value = ""; addFiles(files); };
-const drop = $("drop");
-["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", (e) => addFiles([...e.dataTransfer.files]));
+const box = $("kb-box");
+["dragenter", "dragover"].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.remove("over"); }));
+box.addEventListener("drop", (e) => { if ((KB.limits.uploads_left ?? 1) > 0) addFiles([...e.dataTransfer.files]); });
 
 // ================= document viewer =================
 async function openDoc(id, passage, n) {
@@ -505,12 +501,11 @@ $("viewer-close").onclick = closeViewer;
 $("scrim").onclick = closeViewer;
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeViewer(); });
 
-// ================= 02 configuration: provider, model, key =================
+// ================= 2. configuration: answer model, model, key =================
 function initConfig() {
   CHOICE.provider = LLM.default_provider || "anthropic";
   CHOICE.models.anthropic = LLM.anthropic.models[0];
   CHOICE.models.openai = LLM.openai.models[0];
-  if (!LLM.gemini.available) $("provider").querySelector('[value="gemini"]').textContent = "Google Gemini (not set up)";
   $("provider").value = CHOICE.provider;
   renderConfig();
 }
@@ -520,7 +515,7 @@ $("key").oninput = () => { if (CHOICE.provider in CHOICE.keys) CHOICE.keys[CHOIC
 
 function renderConfig() {
   const p = CHOICE.provider, byKey = p === "anthropic" || p === "openai";
-  // model dropdown: the provider's models; Gemini and "No model" show a single fixed entry
+  // the model dropdown lists the chosen provider's models; Gemini and "No model" show one fixed entry
   const models = byKey ? LLM[p].models : p === "gemini" ? [LLM.gemini.model] : ["None"];
   $("model").innerHTML = models.map((m) => `<option value="${esc(m)}"${byKey && m === CHOICE.models[p] ? " selected" : ""}>${esc(m)}</option>`).join("");
   $("model").disabled = !byKey;
@@ -541,7 +536,7 @@ function renderStatus() {
     else { text = `Ready: answers will be written by <b>${esc(CHOICE.models[p])}</b> with your key.`; html = true; }
   } else if (p === "gemini") {
     if (LLM.gemini.available) { text = `Ready: answers will be written by <b>${esc(LLM.gemini.model)}</b> on the site's free demo keys. If they hit their limit, the answer is quoted instead.`; html = true; }
-    else { text = "The Gemini demo keys aren't set up on this server, so answers will be quoted from the documents."; kind = "warn"; }
+    else { text = "Uses the site's Gemini keys, which are added on the cloud server. None are added on this machine, so answers here are quoted from the documents."; kind = "warn"; }
   } else { text = "No language model: answers are the most relevant sentences, quoted from the documents with citations."; kind = "info"; }
   $("status").querySelector(".dot").className = "dot" + (kind ? " " + kind : "");
   $("status-text")[html ? "innerHTML" : "textContent"] = text;
@@ -549,7 +544,7 @@ function renderStatus() {
   $("using").innerHTML = `Searching <b>${KB.documents.length} documents</b>, answered by <b>${esc(who)}</b>.`;
 }
 
-// ================= 03 ask =================
+// ================= 3. ask =================
 function renderTries() {
   const samples = KB.documents.some((d) => d.origin === "sample");
   const mine = KB.documents.filter((d) => d.origin === "uploaded");
@@ -582,13 +577,13 @@ async function ask() {
 }
 function showAnswer() { $("answer-empty").classList.add("hidden"); $("answer-box").classList.remove("hidden"); }
 
-// ================= 04 answer, 05 sources, 06 trace =================
+// ================= 4. answer, 5. sources, 6. trace =================
 function render(d) {
   LAST = d; showAnswer();
   const t = d.trace, g = d.guardrails || {};
   $("answer").className = "answer" + (d.status === "answered" ? "" : " muted");
   $("answer").innerHTML = esc(d.answer).replace(/\[(\d+)\]/g, (m, n) => `<button type="button" class="cite" data-cite="${n}" aria-label="Go to source ${n}">${n}</button>`);
-  $("answer-by").textContent = d.status !== "answered" ? "" : t.model === "extractive-fallback" ? "Quoted from the documents, no model" : `Written by ${t.provider || t.model}`;
+  $("answer-by").textContent = d.status !== "answered" ? "" : t.model === "extractive-fallback" ? "quoted, no model" : t.provider || t.model;
 
   const c = [];
   if (d.status === "blocked") c.push(["bad", "Blocked by the input check"]);
@@ -597,7 +592,7 @@ function render(d) {
   if (d.status === "answered") {
     const gr = g.grounding || {};
     c.push([gr.flagged ? "bad" : "", `${Math.round((gr.score ?? 1) * 100)}% of sentences supported by sources`]);
-    if (t.model === "extractive-fallback") c.push(["warn", "Quoted from the documents"]);
+    c.push([t.model === "extractive-fallback" ? "warn" : "info", t.model === "extractive-fallback" ? "Quoted from the documents" : `Written by ${t.model}`]);
   }
   if (d.cached) c.push(["info", "Repeat question, answered from cache"]);
   if (d.workspace === "custom") c.push(["info", "Searched your copy of the knowledge base"]);
@@ -609,7 +604,7 @@ function render(d) {
   $("unsupported").classList.toggle("hidden", !uns.length);
   $("unsupported").textContent = uns.length ? "Not supported by the sources: " + uns.join(" ") : "";
 
-  // 05 sources
+  // 5. sources
   $("sources-empty").classList.toggle("hidden", d.sources.length > 0);
   $("passages").classList.toggle("hidden", !d.sources.length);
   $("sources-empty").textContent = d.status === "blocked" ? "No search ran: the question was blocked by the input check." : "The passages behind the answer will appear here.";
@@ -626,7 +621,7 @@ function render(d) {
     </article>`;
   }).join("");
 
-  // 06 trace
+  // 6. trace
   $("how").classList.add("hidden"); $("steps").classList.remove("hidden"); $("trace-foot").classList.remove("hidden");
   const total = Math.max(t.total_ms, 1);
   $("steps").innerHTML = t.spans.map((s) => {
